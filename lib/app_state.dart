@@ -18,7 +18,7 @@ class AppState extends ChangeNotifier {
   List<Item> recents = [];
   Map<String, int> positions = {};
   Map<String, String> prefChannel = {};
-  bool tabLive = true;
+  int tab = 0;
   int _routes = 0;
 
   bool get loggedIn => source != null;
@@ -105,13 +105,12 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// L'anteprima in home parte solo nella scheda TV e quando non c'è altro in primo piano.
-  bool get heroActive => tabLive && _routes == 0;
+  /// L'anteprima parte solo nella scheda visibile e quando non c'è altro in primo piano.
+  bool heroActiveFor(int t) => tab == t && _routes == 0;
 
   void setTab(int i) {
-    final v = i == 0;
-    if (v != tabLive) {
-      tabLive = v;
+    if (i != tab) {
+      tab = i;
       notifyListeners();
     }
   }

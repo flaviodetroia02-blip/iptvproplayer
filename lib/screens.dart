@@ -80,11 +80,38 @@ class BrowseScreen extends StatelessWidget {
     return ListenableBuilder(listenable: state, builder: (c, _) => _body(c));
   }
 
+  /// Film e serie in primo piano: le novità con locandina, con anteprima muta.
+  List<HeroSlide> _vodSlides(BuildContext context) {
+    final withImg = state.itemsOf(kind).where((i) => i.image != null).toList();
+    withImg.sort((a, b) => (b.added ?? 0).compareTo(a.added ?? 0));
+    return [
+      for (final i in withImg.take(8))
+        HeroSlide(
+          id: i.id,
+          badge: i.kind == Kind.movie ? 'Film' : 'Serie TV',
+          title: i.name,
+          subtitle: i.group,
+          live: false,
+          image: i.image,
+          preview: i.url.isEmpty ? null : i,
+          previewLoader: i.url.isEmpty
+              ? () async {
+                  final eps = await state.episodes(i);
+                  return eps.isEmpty ? null : eps.first.url;
+                }
+              : null,
+          onWatch: () => openItem(context, state, i),
+        ),
+    ];
+  }
+
   List<HeroSlide> _slides(BuildContext context) {
+    if (kind != Kind.live) return _vodSlides(context);
     final out = <HeroSlide>[];
     for (final m in state.matches) {
       final best = state.bestChannel(m);
       out.add(HeroSlide(
+        id: '${m.home}-${m.away}',
         badge: m.league,
         title: '${m.home} – ${m.away}',
         subtitle: m.when,
@@ -99,6 +126,7 @@ class BrowseScreen extends StatelessWidget {
     if (out.isEmpty) {
       for (final c in popularChannels(state.live).take(6)) {
         out.add(HeroSlide(
+          id: c.id,
           badge: 'Tra i più seguiti in Italia',
           title: c.name,
           subtitle: c.group,
@@ -153,9 +181,9 @@ class BrowseScreen extends StatelessWidget {
       onPlay: () => openItem(context, state, featured),
       onFav: () => state.toggleFav(featured),
     );
-    if (live) {
-      final slides = _slides(context);
-      if (slides.isNotEmpty) hero = HeroCarousel(slides: slides, active: state.heroActive);
+    final slides = _slides(context);
+    if (slides.isNotEmpty) {
+      hero = HeroCarousel(slides: slides, active: state.heroActiveFor(kind.index));
     }
 
     final top = <Widget>[];

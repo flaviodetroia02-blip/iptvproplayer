@@ -63,6 +63,7 @@ class XtreamClient {
           group: cats['${s['category_id']}'] ?? 'Altro',
           kind: Kind.movie,
           image: _img(s['stream_icon']),
+          added: int.tryParse('${s['added']}'),
         ),
     ];
   }
@@ -79,6 +80,7 @@ class XtreamClient {
           group: cats['${s['category_id']}'] ?? 'Altro',
           kind: Kind.series,
           image: _img(s['cover']),
+          added: int.tryParse('${s['last_modified']}'),
         ),
     ];
   }

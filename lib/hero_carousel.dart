@@ -6,18 +6,23 @@ import 'theme.dart';
 import 'widgets.dart';
 
 class HeroSlide {
-  final String badge, title, subtitle;
+  final String id, badge, title, subtitle;
   final bool live;
-  final Item? preview; // canale mostrato in anteprima, senza audio
+  final String? image; // locandina mostrata finché non parte il video
+  final Item? preview; // contenuto mostrato in anteprima, senza audio
+  final Future<String?> Function()? previewLoader; // per le serie: primo episodio
   final VoidCallback onWatch;
   final VoidCallback? onChange; // "Cambia canale"
   const HeroSlide({
+    required this.id,
     required this.badge,
     required this.title,
     required this.subtitle,
     required this.live,
     required this.preview,
     required this.onWatch,
+    this.image,
+    this.previewLoader,
     this.onChange,
   });
 }
@@ -38,6 +43,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
   late final VideoController _video = VideoController(_player);
   int _i = 0;
   String? _url;
+  bool _muted = true;
 
   @override
   void initState() {
@@ -59,16 +65,52 @@ class _HeroCarouselState extends State<HeroCarousel> {
     super.dispose();
   }
 
-  void _sync() {
-    final want = (widget.active && widget.slides.isNotEmpty) ? widget.slides[_i].preview?.url : null;
+  final Map<String, String?> _cache = {};
+  final Set<String> _loading = {};
+
+  void _setUrl(String? want) {
     if (want == _url) return;
     _url = want;
     if (want == null) {
       _player.stop();
     } else {
-      _player.setVolume(0);
+      _player.setVolume(_muted ? 0 : 100);
       _player.open(Media(want));
     }
+  }
+
+  void _sync() {
+    if (widget.slides.isEmpty || !widget.active) {
+      _setUrl(null);
+      return;
+    }
+    final s = widget.slides[_i];
+    if (s.preview != null) {
+      _setUrl(s.preview!.url);
+    } else if (s.previewLoader == null) {
+      _setUrl(null);
+    } else if (_cache.containsKey(s.id)) {
+      _setUrl(_cache[s.id]);
+    } else {
+      _setUrl(null);
+      _resolve(s);
+    }
+  }
+
+  Future<void> _resolve(HeroSlide s) async {
+    if (!_loading.add(s.id)) return;
+    String? u;
+    try {
+      u = await s.previewLoader!();
+    } catch (_) {}
+    _loading.remove(s.id);
+    _cache[s.id] = u;
+    if (mounted) setState(_sync);
+  }
+
+  void _toggleSound() {
+    setState(() => _muted = !_muted);
+    _player.setVolume(_muted ? 0 : 100);
   }
 
   void _go(int d) {
@@ -106,6 +148,11 @@ class _HeroCarouselState extends State<HeroCarousel> {
               ),
             ),
           ),
+          if (s.image != null)
+            Image.network(s.image!,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink()),
           if (_url != null)
             Video(
               controller: _video,
@@ -148,7 +195,8 @@ class _HeroCarouselState extends State<HeroCarousel> {
                   const SizedBox(height: 6),
                   Row(mainAxisSize: MainAxisSize.min, children: [
                     if (_url != null) ...[
-                      const Icon(Icons.volume_off_rounded, size: 15, color: AppColors.textSecondary),
+                      Icon(_muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+          size: 15, color: AppColors.textSecondary),
                       const SizedBox(width: 6),
                     ],
                     Flexible(child: Text(s.subtitle, style: text.bodySmall)),
@@ -182,6 +230,17 @@ class _HeroCarouselState extends State<HeroCarousel> {
               ),
             ),
           ),
+          if (_url != null)
+            Positioned(
+              right: 24,
+              bottom: 28,
+              child: IconButton(
+                tooltip: _muted ? 'Attiva audio' : 'Disattiva audio',
+                onPressed: _toggleSound,
+                icon: Icon(_muted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
+                style: arrow,
+              ),
+            ),
           if (n > 1)
             Positioned(
               right: 24,

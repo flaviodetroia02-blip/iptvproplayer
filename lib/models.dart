@@ -5,6 +5,7 @@ class Item {
   final String? image;
   final Kind kind;
   final String? seriesId;
+  final int? added; // data di aggiunta (se il servizio la fornisce)
   const Item({
     required this.name,
     required this.url,
@@ -12,12 +13,13 @@ class Item {
     required this.kind,
     this.image,
     this.seriesId,
+    this.added,
   });
 
   String get id => seriesId != null ? 'series:$seriesId' : url;
 
   Map<String, dynamic> toJson() =>
-      {'n': name, 'u': url, 'g': group, 'k': kind.index, 'i': image, 's': seriesId};
+      {'n': name, 'u': url, 'g': group, 'k': kind.index, 'i': image, 's': seriesId, 'a': added};
 
   factory Item.fromJson(Map<String, dynamic> j) => Item(
         name: j['n'] as String,
@@ -26,6 +28,7 @@ class Item {
         kind: Kind.values[j['k'] as int],
         image: j['i'] as String?,
         seriesId: j['s'] as String?,
+        added: j['a'] as int?,
       );
 }
 
