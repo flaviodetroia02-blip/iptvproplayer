@@ -14,9 +14,12 @@ class AppState extends ChangeNotifier {
   Map<String, dynamic>? source;
   List<Item> live = [], movies = [], series = [];
   Set<String> favorites = {};
-  List<Match> matches = [];
+  List<Fixture> matches = [];
   List<Item> recents = [];
   Map<String, int> positions = {};
+  Map<String, String> prefChannel = {};
+  bool tabLive = true;
+  int _routes = 0;
 
   bool get loggedIn => source != null;
 
@@ -27,6 +30,8 @@ class AppState extends ChangeNotifier {
     if (r != null) {
       recents = [for (final j in jsonDecode(r) as List) Item.fromJson(j as Map<String, dynamic>)];
     }
+    final lc = _prefs.getString('lc');
+    if (lc != null) prefChannel = (jsonDecode(lc) as Map<String, dynamic>).map((k, v) => MapEntry(k, v as String));
     final p = _prefs.getString('pos');
     if (p != null) {
       positions = (jsonDecode(p) as Map<String, dynamic>).map((k, v) => MapEntry(k, v as int));
@@ -98,6 +103,51 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// L'anteprima in home parte solo nella scheda TV e quando non c'è altro in primo piano.
+  bool get heroActive => tabLive && _routes == 0;
+
+  void setTab(int i) {
+    final v = i == 0;
+    if (v != tabLive) {
+      tabLive = v;
+      notifyListeners();
+    }
+  }
+
+  void routePush() {
+    _routes++;
+    notifyListeners();
+  }
+
+  void routePop() {
+    _routes--;
+    notifyListeners();
+  }
+
+  bool hasPreferred(Fixture m) => _preferred(m) != null;
+
+  Item? _preferred(Fixture m) {
+    final id = prefChannel[m.tag];
+    if (id == null) return null;
+    for (final c in live) {
+      if (c.id == id) return c;
+    }
+    return null;
+  }
+
+  /// Canale da usare per una partita: quello scelto in passato, o il più probabile.
+  Item? bestChannel(Fixture m) {
+    final p = _preferred(m);
+    if (p != null) return p;
+    final l = sportsChannels(live, m.tag);
+    return l.isEmpty ? null : l.first;
+  }
+
+  void setPreferred(Fixture m, Item c) {
+    prefChannel[m.tag] = c.id;
+    _prefs.setString('lc', jsonEncode(prefChannel));
   }
 
   void _refreshMatches() {

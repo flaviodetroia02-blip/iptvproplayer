@@ -117,7 +117,10 @@ class _ShellState extends State<Shell> {
                 entries: _entries,
                 index: _index,
                 labelsAlways: wide,
-                onChanged: (i) => setState(() => _index = i),
+                onChanged: (i) {
+                  setState(() => _index = i);
+                  s.setTab(i);
+                },
               ),
             ),
           ),

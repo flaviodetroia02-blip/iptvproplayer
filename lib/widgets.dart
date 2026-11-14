@@ -373,7 +373,7 @@ class EventBanner extends StatelessWidget {
 }
 
 class MatchCard extends StatelessWidget {
-  final Match match;
+  final Fixture match;
   final VoidCallback onWatch;
   const MatchCard({super.key, required this.match, required this.onWatch});
 

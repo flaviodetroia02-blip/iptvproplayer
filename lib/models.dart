@@ -32,16 +32,18 @@ class Item {
 String _two(int n) => n.toString().padLeft(2, '0');
 
 /// Partita di Serie A o Champions League.
-class Match {
+class Fixture {
   final String home, away, league;
-  final bool cup;
+  final String tag; // 'a' Serie A, 'eu' coppe europee, 'nz' nazionali
+  final int score;
   final DateTime start;
-  const Match({
+  const Fixture({
     required this.home,
     required this.away,
     required this.league,
-    required this.cup,
+    required this.tag,
     required this.start,
+    this.score = 0,
   });
 
   bool get live {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'app_state.dart';
+import 'hero_carousel.dart';
 import 'models.dart';
 import 'player_screen.dart';
 import 'sports.dart';
@@ -10,13 +11,14 @@ void openItem(BuildContext context, AppState state, Item i) {
   final Widget page = (i.kind == Kind.series && i.url.isEmpty)
       ? SeriesDetail(state: state, item: i)
       : PlayerScreen(title: i.name, url: i.url, state: state, item: i);
-  Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+  state.routePush();
+  Navigator.push(context, MaterialPageRoute(builder: (_) => page)).then((_) => state.routePop());
 }
 
 
 /// Elenco dei canali sportivi della playlist per guardare una partita.
-void showChannelPicker(BuildContext context, AppState state, Match m) {
-  final list = sportsChannels(state.live, cup: m.cup);
+void showChannelPicker(BuildContext context, AppState state, Fixture m) {
+  final list = sportsChannels(state.live, m.tag);
   showModalBottomSheet(
     context: context,
     backgroundColor: AppColors.surface,
@@ -55,6 +57,7 @@ void showChannelPicker(BuildContext context, AppState state, Match m) {
                     title: Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis),
                     onTap: () {
                       Navigator.pop(ctx);
+                      state.setPreferred(m, c);
                       openItem(context, state, c);
                     },
                   ),
@@ -75,6 +78,37 @@ class BrowseScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(listenable: state, builder: (c, _) => _body(c));
+  }
+
+  List<HeroSlide> _slides(BuildContext context) {
+    final out = <HeroSlide>[];
+    for (final m in state.matches) {
+      final best = state.bestChannel(m);
+      out.add(HeroSlide(
+        badge: m.league,
+        title: '${m.home} – ${m.away}',
+        subtitle: m.when,
+        live: m.live,
+        preview: best,
+        onWatch: () => (best != null && state.hasPreferred(m))
+            ? openItem(context, state, best)
+            : showChannelPicker(context, state, m),
+        onChange: () => showChannelPicker(context, state, m),
+      ));
+    }
+    if (out.isEmpty) {
+      for (final c in popularChannels(state.live).take(6)) {
+        out.add(HeroSlide(
+          badge: 'Tra i più seguiti in Italia',
+          title: c.name,
+          subtitle: c.group,
+          live: false,
+          preview: c,
+          onWatch: () => openItem(context, state, c),
+        ));
+      }
+    }
+    return out;
   }
 
   Widget _body(BuildContext context) {
@@ -119,48 +153,21 @@ class BrowseScreen extends StatelessWidget {
       onPlay: () => openItem(context, state, featured),
       onFav: () => state.toggleFav(featured),
     );
-    final top = <Widget>[];
     if (live) {
-      final pop = popularChannels(state.live);
-      if (state.matches.isNotEmpty) {
-        final m = state.matches.first;
-        hero = EventBanner(
-          badge: m.league,
-          title: '${m.home} – ${m.away}',
-          subtitle: m.when,
-          button: 'Guarda ora',
-          live: m.live,
-          onPressed: () => showChannelPicker(context, state, m),
-        );
-        top.add(Rail(
-          title: 'Partite in programma',
-          height: 216,
-          children: [
-            for (final m in state.matches)
-              MatchCard(match: m, onWatch: () => showChannelPicker(context, state, m)),
-          ],
-        ));
-      } else if (pop.isNotEmpty) {
-        hero = EventBanner(
-          badge: 'Tra i più seguiti in Italia',
-          title: pop.first.name,
-          subtitle: pop.first.group,
-          button: 'Guarda ora',
-          live: false,
-          onPressed: () => openItem(context, state, pop.first),
-        );
-      }
-      if (recents.isNotEmpty) {
-        top.add(Rail(title: 'Visti di recente', height: h, children: [for (final i in recents) card(i)]));
-      }
-      if (favs.isNotEmpty) {
-        top.add(Rail(title: 'Preferiti', height: h, children: [for (final i in favs) card(i)]));
-      }
-      if (pop.isNotEmpty) {
-        top.add(Rail(title: 'Più seguiti in Italia', height: h, children: [for (final i in pop) card(i)]));
-      }
-    } else if (recents.isNotEmpty) {
-      top.add(Rail(title: 'Continua a guardare', height: h, children: [for (final i in recents) card(i)]));
+      final slides = _slides(context);
+      if (slides.isNotEmpty) hero = HeroCarousel(slides: slides, active: state.heroActive);
+    }
+
+    final top = <Widget>[];
+    if (recents.isNotEmpty) {
+      top.add(Rail(
+        title: live ? 'Visti di recente' : 'Continua a guardare',
+        height: h,
+        children: [for (final i in recents) card(i)],
+      ));
+    }
+    if (favs.isNotEmpty) {
+      top.add(Rail(title: 'Preferiti', height: h, children: [for (final i in favs) card(i)]));
     }
 
     return ListView(padding: const EdgeInsets.only(bottom: 32), children: [
