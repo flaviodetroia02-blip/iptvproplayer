@@ -294,3 +294,123 @@ class FeaturedBanner extends StatelessWidget {
     );
   }
 }
+
+/// Riquadro grande in alto per eventi e canali in primo piano.
+class EventBanner extends StatelessWidget {
+  final String badge, title, subtitle, button;
+  final bool live;
+  final VoidCallback onPressed;
+  const EventBanner({
+    super.key,
+    required this.badge,
+    required this.title,
+    required this.subtitle,
+    required this.button,
+    required this.live,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return SizedBox(
+      height: 400,
+      child: Stack(fit: StackFit.expand, children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [tone(title, lightness: 0.34), AppColors.background],
+            ),
+          ),
+        ),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x00111113), AppColors.background],
+              stops: [0.35, 1],
+            ),
+          ),
+        ),
+        Positioned(
+          left: 24,
+          right: 24,
+          bottom: 28,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: live ? AppColors.accent : AppColors.surfaceHigh,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(badge,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+            ),
+            const SizedBox(height: 12),
+            Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: text.headlineMedium),
+            const SizedBox(height: 6),
+            Text(subtitle, style: text.bodySmall),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: onPressed,
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: Text(button),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+              ),
+            ),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+class MatchCard extends StatelessWidget {
+  final Match match;
+  final VoidCallback onWatch;
+  const MatchCard({super.key, required this.match, required this.onWatch});
+
+  @override
+  Widget build(BuildContext context) {
+    const name = TextStyle(fontSize: 16, fontWeight: FontWeight.w700);
+    return Container(
+      width: 290,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(match.league,
+            style: const TextStyle(
+                color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 12.5)),
+        const SizedBox(height: 10),
+        Text(match.home, maxLines: 1, overflow: TextOverflow.ellipsis, style: name),
+        Text(match.away, maxLines: 1, overflow: TextOverflow.ellipsis, style: name),
+        const SizedBox(height: 8),
+        Text(match.when,
+            style: TextStyle(
+                fontSize: 13,
+                color: match.live ? AppColors.accent : AppColors.textSecondary,
+                fontWeight: match.live ? FontWeight.w700 : FontWeight.w400)),
+        const Spacer(),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: onWatch,
+            style: FilledButton.styleFrom(
+                backgroundColor: AppColors.accent, foregroundColor: Colors.white),
+            child: const Text('Guarda ora'),
+          ),
+        ),
+      ]),
+    );
+  }
+}

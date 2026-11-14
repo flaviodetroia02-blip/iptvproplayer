@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'm3u.dart';
 import 'models.dart';
+import 'sports.dart';
 import 'xtream.dart';
 
 class AppState extends ChangeNotifier {
@@ -13,12 +14,23 @@ class AppState extends ChangeNotifier {
   Map<String, dynamic>? source;
   List<Item> live = [], movies = [], series = [];
   Set<String> favorites = {};
+  List<Match> matches = [];
+  List<Item> recents = [];
+  Map<String, int> positions = {};
 
   bool get loggedIn => source != null;
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
     favorites = (_prefs.getStringList('fav') ?? []).toSet();
+    final r = _prefs.getString('recents');
+    if (r != null) {
+      recents = [for (final j in jsonDecode(r) as List) Item.fromJson(j as Map<String, dynamic>)];
+    }
+    final p = _prefs.getString('pos');
+    if (p != null) {
+      positions = (jsonDecode(p) as Map<String, dynamic>).map((k, v) => MapEntry(k, v as int));
+    }
     final saved = _prefs.getString('source');
     if (saved != null) {
       source = jsonDecode(saved) as Map<String, dynamic>;
@@ -76,6 +88,7 @@ class AppState extends ChangeNotifier {
       series = se;
       loading = false;
       notifyListeners();
+      _refreshMatches();
       return true;
     } catch (_) {
       error = kIsWeb
@@ -85,6 +98,32 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  void _refreshMatches() {
+    fetchMatches().then((m) {
+      matches = m;
+      notifyListeners();
+    });
+  }
+
+  void markWatched(Item i) {
+    recents.removeWhere((r) => r.id == i.id);
+    recents.insert(0, i);
+    if (recents.length > 20) recents = recents.sublist(0, 20);
+    _prefs.setString('recents', jsonEncode([for (final r in recents) r.toJson()]));
+    Future.microtask(notifyListeners);
+  }
+
+  int positionOf(String url) => positions[url] ?? 0;
+
+  void savePosition(String url, int sec, int total) {
+    if (total > 0 && sec >= total - 60) {
+      positions.remove(url);
+    } else if (sec > 10) {
+      positions[url] = sec;
+    }
+    _prefs.setString('pos', jsonEncode(positions));
   }
 
   Future<void> logout() async {
