@@ -1,0 +1,19 @@
+name: iptv_player
+description: Player IPTV multipiattaforma con interfaccia scura e accento rosso.
+publish_to: "none"
+version: 0.2.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  shared_preferences: ^2.2.0
+  media_kit: ^1.1.10
+  media_kit_video: ^1.2.4
+  media_kit_libs_video: ^1.0.4
+
+flutter:
+  uses-material-design: true
