@@ -16,11 +16,7 @@ class PlayerScreen extends StatefulWidget {
 
 class _PlayerScreenState extends State<PlayerScreen> {
   late final Player player = Player();
-  // Rendering software: evita il video in miniatura visto su alcuni PC Windows.
-  late final VideoController controller = VideoController(
-    player,
-    configuration: const VideoControllerConfiguration(enableHardwareAcceleration: false),
-  );
+  late final VideoController controller = VideoController(player);
 
   @override
   void initState() {
@@ -53,18 +49,23 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(children: [
+      body: Stack(fit: StackFit.expand, children: [
         Positioned.fill(child: Video(controller: controller, fit: BoxFit.contain)),
-        SafeArea(
-          child: Row(children: [
-            const BackButton(color: Colors.white),
-            Expanded(
-              child: Text(widget.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-            ),
-          ]),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            child: Row(children: [
+              const BackButton(color: Colors.white),
+              Expanded(
+                child: Text(widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ]),
+          ),
         ),
       ]),
     );
