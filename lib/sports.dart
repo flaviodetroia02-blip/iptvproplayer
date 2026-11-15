@@ -130,7 +130,7 @@ Future<List<Fixture>> fetchMatches() async {
     }
   }
   all.sort((a, b) => b.score != a.score ? b.score.compareTo(a.score) : a.start.compareTo(b.start));
-  return all.take(8).toList();
+  return all.take(30).toList();
 }
 
 /// Canali sportivi presenti nella playlist dell'utente, in ordine di probabilità.

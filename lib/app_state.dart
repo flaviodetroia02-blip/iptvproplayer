@@ -17,6 +17,7 @@ class AppState extends ChangeNotifier {
   List<Fixture> matches = [];
   List<Item> recents = [];
   Map<String, int> positions = {};
+  Map<String, int> durations = {};
   Map<String, String> prefChannel = {};
   int tab = 0;
   int _routes = 0;
@@ -29,6 +30,10 @@ class AppState extends ChangeNotifier {
     final r = _prefs.getString('recents');
     if (r != null) {
       recents = [for (final j in jsonDecode(r) as List) Item.fromJson(j as Map<String, dynamic>)];
+    }
+    final dur = _prefs.getString('dur');
+    if (dur != null) {
+      durations = (jsonDecode(dur) as Map<String, dynamic>).map((k, v) => MapEntry(k, v as int));
     }
     final lc = _prefs.getString('lc');
     if (lc != null) prefChannel = (jsonDecode(lc) as Map<String, dynamic>).map((k, v) => MapEntry(k, v as String));
@@ -169,10 +174,21 @@ class AppState extends ChangeNotifier {
   void savePosition(String url, int sec, int total) {
     if (total > 0 && sec >= total - 60) {
       positions.remove(url);
+      durations.remove(url);
     } else if (sec > 10) {
       positions[url] = sec;
+      if (total > 0) durations[url] = total;
     }
     _prefs.setString('pos', jsonEncode(positions));
+    _prefs.setString('dur', jsonEncode(durations));
+  }
+
+  /// Quanto hai già guardato (0-1), se lo sappiamo.
+  double? progressOf(String url) {
+    final p = positions[url];
+    final d = durations[url];
+    if (p == null || d == null || d <= 0) return null;
+    return (p / d).clamp(0.0, 1.0).toDouble();
   }
 
   Future<void> logout() async {

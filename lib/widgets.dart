@@ -170,35 +170,88 @@ class LiveCard extends StatelessWidget {
   }
 }
 
-/// Locandina (stile Netflix): solo immagine, si ingrandisce al passaggio del mouse.
+/// Locandina (stile Netflix): al passaggio del mouse compaiono titolo e tasto play.
 class PosterCard extends StatelessWidget {
   final Item item;
   final VoidCallback onTap;
-  const PosterCard({super.key, required this.item, required this.onTap});
+  final double? progress; // quanto hai già guardato, da 0 a 1
+  const PosterCard({super.key, required this.item, required this.onTap, this.progress});
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: item.name,
-      waitDuration: const Duration(milliseconds: 500),
-      child: SizedBox(
-        width: 150,
-        child: FocusTile(
-          radius: 6,
-          scale: 1.08,
-          border: false,
-          onTap: onTap,
-          builder: (_) => AspectRatio(
-            aspectRatio: 2 / 3,
-            child: Art(url: item.image, title: item.name),
-          ),
+    final p = progress;
+    return SizedBox(
+      width: 150,
+      child: FocusTile(
+        radius: 6,
+        scale: 1.08,
+        border: false,
+        onTap: onTap,
+        builder: (active) => AspectRatio(
+          aspectRatio: 2 / 3,
+          child: Stack(fit: StackFit.expand, children: [
+            Art(url: item.image, title: item.name),
+            IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: active ? 1 : 0,
+                duration: const Duration(milliseconds: 150),
+                child: DecoratedBox(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x00000000), Color(0xEE000000)],
+                      stops: [0.35, 1],
+                    ),
+                  ),
+                  child: Align(
+                    alignment: Alignment.bottomLeft,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(10, 10, 10, p != null ? 14 : 10),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(item.name,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: 30,
+                            height: 30,
+                            decoration:
+                                const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                            child: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 20),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (p != null && p > 0.01)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: LinearProgressIndicator(
+                  value: p,
+                  minHeight: 3,
+                  backgroundColor: const Color(0x66000000),
+                  color: AppColors.accent,
+                ),
+              ),
+          ]),
         ),
       ),
     );
   }
 }
 
-class Rail extends StatelessWidget {
+/// Riga scorrevole con frecce laterali (utili col mouse sul PC).
+class Rail extends StatefulWidget {
   final String title;
   final double height;
   final List<Widget> children;
@@ -212,39 +265,120 @@ class Rail extends StatelessWidget {
   });
 
   @override
+  State<Rail> createState() => _RailState();
+}
+
+class _RailState extends State<Rail> {
+  final _c = ScrollController();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _scroll(int dir) {
+    if (!_c.hasClients) return;
+    final step = MediaQuery.of(context).size.width * 0.7;
+    final target = (_c.offset + dir * step).clamp(0.0, _c.position.maxScrollExtent).toDouble();
+    _c.animateTo(target, duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic);
+  }
+
+  Widget _arrow(IconData icon, int dir) => IconButton(
+        onPressed: () => _scroll(dir),
+        icon: Icon(icon, size: 26),
+        style: IconButton.styleFrom(
+          backgroundColor: const Color(0xB3000000),
+          foregroundColor: Colors.white,
+        ),
+      );
+
+  @override
   Widget build(BuildContext context) {
+    final wide = MediaQuery.of(context).size.width >= 700;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(24, 26, 16, 0),
-        child: Row(children: [
-          Expanded(
-            child: Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium),
-          ),
-          if (onSeeAll != null)
-            TextButton(
-              onPressed: onSeeAll,
-              style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
-              child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                Text('Vedi tutti'),
-                Icon(Icons.chevron_right_rounded, size: 18),
-              ]),
+      if (widget.title.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 26, 16, 0),
+          child: Row(children: [
+            Expanded(
+              child: Text(widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium),
             ),
+            if (widget.onSeeAll != null)
+              TextButton(
+                onPressed: widget.onSeeAll,
+                style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text('Vedi tutti'),
+                  Icon(Icons.chevron_right_rounded, size: 18),
+                ]),
+              ),
+          ]),
+        ),
+      SizedBox(
+        height: widget.height,
+        child: Stack(children: [
+          ListView.builder(
+            controller: _c,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            itemCount: widget.children.length,
+            itemBuilder: (_, i) =>
+                Padding(padding: const EdgeInsets.only(right: 14), child: widget.children[i]),
+          ),
+          if (wide && widget.children.length > 3) ...[
+            Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: _arrow(Icons.chevron_left_rounded, -1))),
+            Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: _arrow(Icons.chevron_right_rounded, 1))),
+          ],
         ]),
       ),
-      SizedBox(
-        height: height,
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          itemCount: children.length,
-          itemBuilder: (_, i) =>
-              Padding(padding: const EdgeInsets.only(right: 14), child: children[i]),
+    ]);
+  }
+}
+
+/// Schede dei giorni per il calendario (Oggi, Domani, ...).
+class DayTabs extends StatelessWidget {
+  final List<String> labels;
+  final int selected;
+  final ValueChanged<int> onSelect;
+  const DayTabs({super.key, required this.labels, required this.selected, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        itemCount: labels.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) => ChoiceChip(
+          label: Text(labels[i]),
+          selected: i == selected,
+          showCheckmark: false,
+          onSelected: (_) => onSelect(i),
+          selectedColor: AppColors.accent,
+          backgroundColor: AppColors.surface,
+          side: BorderSide.none,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          labelStyle: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: i == selected ? Colors.white : AppColors.textSecondary,
+          ),
         ),
       ),
-    ]);
+    );
   }
 }
 

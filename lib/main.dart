@@ -89,6 +89,11 @@ class _ShellState extends State<Shell> {
               widget.state.logout();
             },
           ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 14),
+            child: Text('Versione 0.4',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
+          ),
         ]),
       ),
     );

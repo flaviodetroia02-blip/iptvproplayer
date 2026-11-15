@@ -19,6 +19,8 @@ class BrowseScreen extends StatefulWidget {
 
 class _BrowseScreenState extends State<BrowseScreen> {
   String? _group;
+  int _day = 0;
+  List<Item> _newest = [];
   List<Item>? _memoFor;
   Map<String, List<Item>> _memo = {};
 
@@ -37,6 +39,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
       bool isN(String s) => s.toLowerCase().contains('netflix');
       names = [...names.where(isN), ...names.where((s) => !isN(s))];
     }
+    _newest = (items.where((i) => i.added != null).toList()..sort((a, b) => b.added!.compareTo(a.added!)))
+        .take(20)
+        .toList();
     _memoFor = items;
     return _memo = {for (final n in names) n: g[n]!};
   }
@@ -72,7 +77,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
   List<HeroSlide> _slides(BuildContext context) {
     if (kind != Kind.live) return _vodSlides(context);
     final out = <HeroSlide>[];
-    for (final m in state.matches) {
+    for (final m in state.matches.take(8)) {
       final best = state.bestChannel(m);
       out.add(HeroSlide(
         id: '${m.home}-${m.away}',
@@ -147,7 +152,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
             fav: state.isFav(i),
             onTap: () => openItem(context, state, i),
             onLong: () => state.toggleFav(i))
-        : PosterCard(item: i, onTap: () => openItem(context, state, i));
+        : PosterCard(
+            item: i,
+            progress: state.progressOf(i.url),
+            onTap: () => openItem(context, state, i));
 
     final featured = favs.isNotEmpty
         ? favs.first
@@ -168,15 +176,42 @@ class _BrowseScreenState extends State<BrowseScreen> {
     final slivers = <Widget>[SliverToBoxAdapter(child: hero)];
 
     if (live && state.matches.isNotEmpty) {
+      final byDay = <DateTime, List<Fixture>>{};
+      for (final m in state.matches) {
+        (byDay[DateTime(m.start.year, m.start.month, m.start.day)] ??= []).add(m);
+      }
+      final days = byDay.keys.toList()..sort();
+      final day = _day.clamp(0, days.length - 1);
+      final today = DateTime.now();
+      String label(DateTime d) {
+        final diff = d.difference(DateTime(today.year, today.month, today.day)).inDays;
+        if (diff <= 0) return 'Oggi';
+        if (diff == 1) return 'Domani';
+        const n = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+        return '${n[d.weekday - 1]} ${d.day}';
+      }
+      final list = byDay[days[day]]!;
+      list.sort((a, b) => a.start.compareTo(b.start));
       slivers.add(SliverToBoxAdapter(
-        child: Rail(
-          title: 'Calendario calcio',
-          height: 250,
-          children: [
-            for (final m in state.matches)
-              MatchCard(match: m, onWatch: () => showChannelPicker(context, state, m)),
-          ],
-        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 26, 24, 10),
+            child: Text('Calendario calcio', style: Theme.of(context).textTheme.titleMedium),
+          ),
+          DayTabs(
+            labels: [for (final d in days) label(d)],
+            selected: day,
+            onSelect: (i) => setState(() => _day = i),
+          ),
+          Rail(
+            title: '',
+            height: 250,
+            children: [
+              for (final m in list)
+                MatchCard(match: m, onWatch: () => showChannelPicker(context, state, m)),
+            ],
+          ),
+        ]),
       ));
     }
     if (live) {
@@ -244,6 +279,12 @@ class _BrowseScreenState extends State<BrowseScreen> {
       }
       if (favs.isNotEmpty) {
         rails.add(Rail(title: 'Preferiti', height: h, children: [for (final i in favs) card(i)]));
+      }
+      if (!live && _newest.isNotEmpty) {
+        rails.add(Rail(
+            title: 'Aggiunti di recente',
+            height: h,
+            children: [for (final i in _newest) card(i)]));
       }
       for (final e in groups.entries) {
         rails.add(Rail(
