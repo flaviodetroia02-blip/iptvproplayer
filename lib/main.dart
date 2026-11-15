@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'app_state.dart';
+import 'browse.dart';
 import 'models.dart';
 import 'premium_nav.dart';
 import 'screens.dart';

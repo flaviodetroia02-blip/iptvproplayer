@@ -39,6 +39,7 @@ class Fixture {
   final String home, away, league;
   final String tag; // 'a' Serie A, 'eu' coppe europee, 'nz' nazionali
   final int score;
+  final String? homeBadge, awayBadge;
   final DateTime start;
   const Fixture({
     required this.home,
@@ -47,6 +48,8 @@ class Fixture {
     required this.tag,
     required this.start,
     this.score = 0,
+    this.homeBadge,
+    this.awayBadge,
   });
 
   bool get live {

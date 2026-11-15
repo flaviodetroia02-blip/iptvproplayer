@@ -37,6 +37,11 @@ int _teamScore(String name) {
   return best;
 }
 
+String? _img(dynamic v) {
+  final s = v?.toString() ?? '';
+  return s.startsWith('http') ? s : null;
+}
+
 String _d(DateTime d) =>
     '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
@@ -77,6 +82,8 @@ Future<List<Fixture>> _day(String day, String query, DateTime now, {String? leag
           tag: _leagueTag[lid]!,
           start: s,
           score: _teamScore(home) + _teamScore(away) + _leagueBonus[lid]!,
+          homeBadge: _img(e['strHomeTeamBadge']),
+          awayBadge: _img(e['strAwayTeamBadge']),
         ));
       } else if (leagueId == null) {
         // Nazionali: l'Italia, oppure sfide tra grandi nazionali.
@@ -92,6 +99,8 @@ Future<List<Fixture>> _day(String day, String query, DateTime now, {String? leag
           tag: 'nz',
           start: s,
           score: (italy ? 25 : 0) + (_nations.contains(h) ? 8 : 0) + (_nations.contains(a) ? 8 : 0),
+          homeBadge: _img(e['strHomeTeamBadge']),
+          awayBadge: _img(e['strAwayTeamBadge']),
         ));
       }
     }

@@ -32,7 +32,7 @@ class Art extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [tone(title), tone(title, lightness: 0.14)],
+            colors: [tone(title), tone(title, lightness: 0.12)],
           ),
         ),
       ),
@@ -40,7 +40,7 @@ class Art extends StatelessWidget {
         label
       else
         Padding(
-          padding: EdgeInsets.all(contain ? 18 : 0),
+          padding: EdgeInsets.all(contain ? 22 : 0),
           child: Image.network(url!,
               fit: contain ? BoxFit.contain : BoxFit.cover,
               errorBuilder: (_, __, ___) => label),
@@ -54,52 +54,75 @@ class LiveBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(4)),
-        child: const Text('Diretta',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.circle, size: 6, color: Colors.white),
+          SizedBox(width: 5),
+          Text('DIRETTA',
+              style: TextStyle(
+                  fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: Colors.white)),
+        ]),
       );
 }
 
-/// Contenitore con evidenziazione quando ha il focus (telecomando, tastiera).
+/// Contenitore con ingrandimento al passaggio del mouse e al focus (telecomando, tastiera).
 class FocusTile extends StatefulWidget {
-  final Widget Function(bool focused) builder;
+  final Widget Function(bool active) builder;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
-  const FocusTile({super.key, required this.builder, required this.onTap, this.onLongPress});
+  final double radius, scale;
+  final bool border;
+  const FocusTile({
+    super.key,
+    required this.builder,
+    required this.onTap,
+    this.onLongPress,
+    this.radius = 12,
+    this.scale = 1.05,
+    this.border = true,
+  });
 
   @override
   State<FocusTile> createState() => _FocusTileState();
 }
 
 class _FocusTileState extends State<FocusTile> {
-  bool _f = false;
+  bool _f = false, _h = false;
 
   @override
   Widget build(BuildContext context) {
+    final active = _f || _h;
     return AnimatedScale(
-      scale: _f ? 1.05 : 1,
-      duration: const Duration(milliseconds: 140),
+      scale: active ? widget.scale : 1,
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOutCubic,
       child: InkWell(
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
         onFocusChange: (v) => setState(() => _f = v),
-        borderRadius: BorderRadius.circular(10),
+        onHover: (v) => setState(() => _h = v),
+        borderRadius: BorderRadius.circular(widget.radius),
         focusColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+        splashColor: Colors.transparent,
         child: Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: _f ? AppColors.accent : Colors.transparent, width: 2),
+            borderRadius: BorderRadius.circular(widget.radius),
+            border: widget.border
+                ? Border.all(color: _f ? AppColors.accent : const Color(0x14FFFFFF), width: 1.5)
+                : (_f ? Border.all(color: Colors.white, width: 2) : null),
           ),
-          child: widget.builder(_f),
+          child: widget.builder(active),
         ),
       ),
     );
   }
 }
 
+/// Scheda canale (stile DAZN): immagine 16:9 con etichetta in diretta, titolo sotto.
 class LiveCard extends StatelessWidget {
   final Item item;
   final bool fav;
@@ -110,47 +133,44 @@ class LiveCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 240,
-      child: FocusTile(
-        onTap: onTap,
-        onLongPress: onLong,
-        builder: (_) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Stack(fit: StackFit.expand, children: [
-                Art(url: item.image, title: item.name, contain: true),
-                const Positioned(right: 8, top: 8, child: LiveBadge()),
-                if (fav)
-                  const Positioned(
-                      left: 8,
-                      top: 8,
-                      child: Icon(Icons.favorite_rounded, size: 18, color: AppColors.accent)),
-              ]),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(item.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text(item.group,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall),
-              ]),
-            ),
-          ],
+      width: 260,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        FocusTile(
+          onTap: onTap,
+          onLongPress: onLong,
+          builder: (_) => AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Stack(fit: StackFit.expand, children: [
+              Art(url: item.image, title: item.name, contain: true),
+              const Positioned(left: 10, top: 10, child: LiveBadge()),
+              if (fav)
+                const Positioned(
+                    right: 10,
+                    top: 10,
+                    child: Icon(Icons.favorite_rounded, size: 18, color: AppColors.accent)),
+            ]),
+          ),
         ),
-      ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(2, 10, 2, 0),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(item.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            const SizedBox(height: 2),
+            Text(item.group,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall),
+          ]),
+        ),
+      ]),
     );
   }
 }
 
+/// Locandina (stile Netflix): solo immagine, si ingrandisce al passaggio del mouse.
 class PosterCard extends StatelessWidget {
   final Item item;
   final VoidCallback onTap;
@@ -158,23 +178,20 @@ class PosterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 140,
-      child: FocusTile(
-        onTap: onTap,
-        builder: (_) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AspectRatio(aspectRatio: 2 / 3, child: Art(url: item.image, title: item.name)),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              child: Text(item.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
-            ),
-          ],
+    return Tooltip(
+      message: item.name,
+      waitDuration: const Duration(milliseconds: 500),
+      child: SizedBox(
+        width: 150,
+        child: FocusTile(
+          radius: 6,
+          scale: 1.08,
+          border: false,
+          onTap: onTap,
+          builder: (_) => AspectRatio(
+            aspectRatio: 2 / 3,
+            child: Art(url: item.image, title: item.name),
+          ),
         ),
       ),
     );
@@ -185,20 +202,43 @@ class Rail extends StatelessWidget {
   final String title;
   final double height;
   final List<Widget> children;
-  const Rail({super.key, required this.title, required this.height, required this.children});
+  final VoidCallback? onSeeAll;
+  const Rail({
+    super.key,
+    required this.title,
+    required this.height,
+    required this.children,
+    this.onSeeAll,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 12),
-        child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+        padding: const EdgeInsets.fromLTRB(24, 26, 16, 0),
+        child: Row(children: [
+          Expanded(
+            child: Text(title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium),
+          ),
+          if (onSeeAll != null)
+            TextButton(
+              onPressed: onSeeAll,
+              style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('Vedi tutti'),
+                Icon(Icons.chevron_right_rounded, size: 18),
+              ]),
+            ),
+        ]),
       ),
       SizedBox(
         height: height,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           itemCount: children.length,
           itemBuilder: (_, i) =>
               Padding(padding: const EdgeInsets.only(right: 14), child: children[i]),
@@ -208,6 +248,130 @@ class Rail extends StatelessWidget {
   }
 }
 
+/// Filtri per categoria, come le schede in alto di DAZN.
+class GenreChips extends StatelessWidget {
+  final List<String> groups;
+  final String? selected;
+  final ValueChanged<String?> onSelect;
+  const GenreChips({super.key, required this.groups, required this.selected, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        itemCount: groups.length + 1,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final label = i == 0 ? 'Tutti' : groups[i - 1];
+          final sel = i == 0 ? selected == null : selected == label;
+          return ChoiceChip(
+            label: Text(label),
+            selected: sel,
+            showCheckmark: false,
+            onSelected: (_) => onSelect(i == 0 ? null : label),
+            selectedColor: AppColors.accent,
+            backgroundColor: AppColors.surface,
+            side: BorderSide.none,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+            labelStyle: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: sel ? Colors.white : AppColors.textSecondary,
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _TeamBadge extends StatelessWidget {
+  final String name;
+  final String? url;
+  const _TeamBadge({required this.name, required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = Center(
+      child: Text(name.isEmpty ? '' : name[0].toUpperCase(),
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+    );
+    return Container(
+      width: 32,
+      height: 32,
+      padding: const EdgeInsets.all(4),
+      clipBehavior: Clip.antiAlias,
+      decoration: const BoxDecoration(color: AppColors.surfaceHigh, shape: BoxShape.circle),
+      child: url == null
+          ? initial
+          : Image.network(url!, fit: BoxFit.contain, errorBuilder: (_, __, ___) => initial),
+    );
+  }
+}
+
+/// Scheda partita con stemmi, orario e tasto "Guarda ora".
+class MatchCard extends StatelessWidget {
+  final Fixture match;
+  final VoidCallback onWatch;
+  const MatchCard({super.key, required this.match, required this.onWatch});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget team(String name, String? badge) => Row(children: [
+          _TeamBadge(name: name, url: badge),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          ),
+        ]);
+    return Container(
+      width: 300,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0x14FFFFFF)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(
+            child: Text(match.league,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 12.5)),
+          ),
+          Text(match.when,
+              style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: match.live ? FontWeight.w800 : FontWeight.w500,
+                  color: match.live ? AppColors.accent : AppColors.textSecondary)),
+        ]),
+        const SizedBox(height: 14),
+        team(match.home, match.homeBadge),
+        const SizedBox(height: 10),
+        team(match.away, match.awayBadge),
+        const Spacer(),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: onWatch,
+            style: FilledButton.styleFrom(
+                backgroundColor: AppColors.accent, foregroundColor: Colors.white),
+            child: const Text('Guarda ora'),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+/// Riquadro di riserva quando non ci sono anteprime disponibili.
 class FeaturedBanner extends StatelessWidget {
   final Item item;
   final bool fav, cover;
@@ -263,102 +427,10 @@ class FeaturedBanner extends StatelessWidget {
             const SizedBox(height: 6),
             Text(item.group, style: text.bodySmall),
             const SizedBox(height: 18),
-            Row(children: [
-              FilledButton.icon(
-                onPressed: onPlay,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: Text(playLabel),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-                ),
-              ),
-              if (item.kind == Kind.live) ...[
-                const SizedBox(width: 12),
-                OutlinedButton.icon(
-                  onPressed: onFav,
-                  icon: Icon(fav ? Icons.favorite_rounded : Icons.favorite_border_rounded, size: 20),
-                  label: Text(fav ? 'Nei preferiti' : 'Aggiungi ai preferiti'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textPrimary,
-                    side: const BorderSide(color: AppColors.surfaceHigh),
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                  ),
-                ),
-              ],
-            ]),
-          ]),
-        ),
-      ]),
-    );
-  }
-}
-
-/// Riquadro grande in alto per eventi e canali in primo piano.
-class EventBanner extends StatelessWidget {
-  final String badge, title, subtitle, button;
-  final bool live;
-  final VoidCallback onPressed;
-  const EventBanner({
-    super.key,
-    required this.badge,
-    required this.title,
-    required this.subtitle,
-    required this.button,
-    required this.live,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return SizedBox(
-      height: 400,
-      child: Stack(fit: StackFit.expand, children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft,
-              colors: [tone(title, lightness: 0.34), AppColors.background],
-            ),
-          ),
-        ),
-        const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0x00111113), AppColors.background],
-              stops: [0.35, 1],
-            ),
-          ),
-        ),
-        Positioned(
-          left: 24,
-          right: 24,
-          bottom: 28,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: live ? AppColors.accent : AppColors.surfaceHigh,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(badge,
-                  style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
-            ),
-            const SizedBox(height: 12),
-            Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: text.headlineMedium),
-            const SizedBox(height: 6),
-            Text(subtitle, style: text.bodySmall),
-            const SizedBox(height: 18),
             FilledButton.icon(
-              onPressed: onPressed,
+              onPressed: onPlay,
               icon: const Icon(Icons.play_arrow_rounded),
-              label: Text(button),
+              label: Text(playLabel),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
@@ -366,49 +438,6 @@ class EventBanner extends StatelessWidget {
               ),
             ),
           ]),
-        ),
-      ]),
-    );
-  }
-}
-
-class MatchCard extends StatelessWidget {
-  final Fixture match;
-  final VoidCallback onWatch;
-  const MatchCard({super.key, required this.match, required this.onWatch});
-
-  @override
-  Widget build(BuildContext context) {
-    const name = TextStyle(fontSize: 16, fontWeight: FontWeight.w700);
-    return Container(
-      width: 290,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(match.league,
-            style: const TextStyle(
-                color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 12.5)),
-        const SizedBox(height: 10),
-        Text(match.home, maxLines: 1, overflow: TextOverflow.ellipsis, style: name),
-        Text(match.away, maxLines: 1, overflow: TextOverflow.ellipsis, style: name),
-        const SizedBox(height: 8),
-        Text(match.when,
-            style: TextStyle(
-                fontSize: 13,
-                color: match.live ? AppColors.accent : AppColors.textSecondary,
-                fontWeight: match.live ? FontWeight.w700 : FontWeight.w400)),
-        const Spacer(),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: onWatch,
-            style: FilledButton.styleFrom(
-                backgroundColor: AppColors.accent, foregroundColor: Colors.white),
-            child: const Text('Guarda ora'),
-          ),
         ),
       ]),
     );
