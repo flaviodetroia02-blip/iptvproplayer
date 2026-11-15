@@ -1,15 +1,38 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:window_manager/window_manager.dart';
 import 'app_state.dart';
+import 'brand.dart';
 import 'browse.dart';
 import 'models.dart';
 import 'premium_nav.dart';
 import 'screens.dart';
 import 'theme.dart';
 
+bool get _desktop => !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+
+Future<void> toggleFullScreen() async {
+  if (!_desktop) return;
+  await windowManager.setFullScreen(!(await windowManager.isFullScreen()));
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
+  if (_desktop) {
+    await windowManager.ensureInitialized();
+    await windowManager.waitUntilReadyToShow(
+      const WindowOptions(title: kAppName, backgroundColor: Colors.black),
+      () async {
+        await windowManager.setFullScreen(true); // su PC si apre a schermo intero
+        await windowManager.show();
+        await windowManager.focus();
+      },
+    );
+  }
   runApp(const PlayerApp());
 }
 
@@ -22,27 +45,44 @@ class PlayerApp extends StatefulWidget {
 
 class _PlayerAppState extends State<PlayerApp> {
   final app = AppState();
+  bool _splash = true;
 
   @override
   void initState() {
     super.initState();
     app.init();
+    Future.delayed(const Duration(milliseconds: 2600), () {
+      if (mounted) setState(() => _splash = false);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Player',
+      title: kAppName,
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
+      builder: (context, child) => CallbackShortcuts(
+        bindings: {
+          // F11 attiva/disattiva lo schermo intero, Esc lo chiude (solo su PC)
+          const SingleActivator(LogicalKeyboardKey.f11): () => toggleFullScreen(),
+          const SingleActivator(LogicalKeyboardKey.escape): () async {
+            if (_desktop && await windowManager.isFullScreen()) {
+              await windowManager.setFullScreen(false);
+            }
+          },
+        },
+        child: Focus(autofocus: true, child: child ?? const SizedBox.shrink()),
+      ),
       home: ListenableBuilder(
         listenable: app,
         builder: (context, _) {
-          if (!app.ready) {
-            return const Scaffold(
-                body: Center(child: CircularProgressIndicator(color: AppColors.accent)));
-          }
-          return app.loggedIn ? Shell(state: app) : LoginScreen(state: app);
+          final Widget page = (_splash || !app.ready)
+              ? const SplashScreen(key: ValueKey('splash'))
+              : (app.loggedIn
+                  ? Shell(key: const ValueKey('shell'), state: app)
+                  : LoginScreen(key: const ValueKey('login'), state: app));
+          return AnimatedSwitcher(duration: const Duration(milliseconds: 600), child: page);
         },
       ),
     );
@@ -89,9 +129,18 @@ class _ShellState extends State<Shell> {
               widget.state.logout();
             },
           ),
+          if (_desktop)
+            ListTile(
+              leading: const Icon(Icons.fullscreen_rounded),
+              title: const Text('Schermo intero (F11)'),
+              onTap: () {
+                Navigator.pop(ctx);
+                toggleFullScreen();
+              },
+            ),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 4, 16, 14),
-            child: Text('Versione 0.4',
+            child: Text('Versione 0.5',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
           ),
         ]),
@@ -131,6 +180,17 @@ class _ShellState extends State<Shell> {
             ),
           ),
         ),
+        if (wide)
+          const Positioned(
+            top: 0,
+            left: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(24, 22, 0, 0),
+                child: BrandLogo(size: 17),
+              ),
+            ),
+          ),
         Positioned(
           top: 0,
           right: 0,

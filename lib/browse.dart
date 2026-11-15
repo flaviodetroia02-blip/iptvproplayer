@@ -90,6 +90,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
             ? openItem(context, state, best)
             : showChannelPicker(context, state, m),
         onChange: () => showChannelPicker(context, state, m),
+        poster: (ctx) => EventPoster(match: m),
       ));
     }
     if (out.isEmpty) {

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+const kAppName = 'PRIMA';
+const kAppTagline = 'Tutto in prima fila';
+
 class AppColors {
   static const background = Color(0xFF111113);
   static const surface = Color(0xFF1B1B1F);

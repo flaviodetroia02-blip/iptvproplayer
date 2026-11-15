@@ -577,3 +577,111 @@ class FeaturedBanner extends StatelessWidget {
     );
   }
 }
+
+class _BigBadge extends StatelessWidget {
+  final String name;
+  final String? url;
+  const _BigBadge({required this.name, required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = Center(
+      child: Text(name.isEmpty ? '' : name[0].toUpperCase(),
+          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 40)),
+    );
+    return Container(
+      width: 104,
+      height: 104,
+      padding: const EdgeInsets.all(16),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0x22FFFFFF),
+        border: Border.all(color: const Color(0x33FFFFFF)),
+      ),
+      child: url == null
+          ? initial
+          : Image.network(url!, fit: BoxFit.contain, errorBuilder: (_, __, ___) => initial),
+    );
+  }
+}
+
+/// Locandina dell'evento mostrata 5 secondi prima che parta l'anteprima.
+class EventPoster extends StatelessWidget {
+  final Fixture match;
+  const EventPoster({super.key, required this.match});
+
+  Widget _side(String name, String? badge) => SizedBox(
+        width: 150,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          _BigBadge(name: name, url: badge),
+          const SizedBox(height: 10),
+          Text(name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        ]),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(fit: StackFit.expand, children: [
+      DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [
+              tone(match.home, lightness: 0.3),
+              const Color(0xFF0B0B0D),
+              tone(match.away, lightness: 0.3),
+            ],
+            stops: const [0, 0.5, 1],
+          ),
+        ),
+      ),
+      const DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0, -0.3),
+            radius: 0.8,
+            colors: [Color(0x22FFFFFF), Color(0x00000000)],
+          ),
+        ),
+      ),
+      Align(
+        alignment: const Alignment(0, -0.42),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(match.league.toUpperCase(),
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 4,
+                    color: Color(0xB3FFFFFF))),
+            const SizedBox(height: 20),
+            Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _side(match.home, match.homeBadge),
+              const SizedBox(width: 24),
+              Column(children: [
+                const SizedBox(height: 28),
+                const Text('VS',
+                    style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2,
+                        color: AppColors.accent)),
+                const SizedBox(height: 8),
+                Text(match.when, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              ]),
+              const SizedBox(width: 24),
+              _side(match.away, match.awayBadge),
+            ]),
+          ]),
+        ),
+      ),
+    ]);
+  }
+}

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -13,6 +14,7 @@ class HeroSlide {
   final Future<String?> Function()? previewLoader; // per le serie: primo episodio
   final VoidCallback onWatch;
   final VoidCallback? onChange; // "Cambia canale"
+  final Widget Function(BuildContext)? poster; // locandina mostrata 5 secondi prima del video
   const HeroSlide({
     required this.id,
     required this.badge,
@@ -24,6 +26,7 @@ class HeroSlide {
     this.image,
     this.previewLoader,
     this.onChange,
+    this.poster,
   });
 }
 
@@ -45,6 +48,9 @@ class _HeroCarouselState extends State<HeroCarousel> {
   int _i = 0;
   String? _url;
   bool _muted = true;
+  String? _posterFor;
+  bool _posterOn = false;
+  Timer? _posterTimer;
 
   @override
   void initState() {
@@ -62,6 +68,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
 
   @override
   void dispose() {
+    _posterTimer?.cancel();
     _player.dispose();
     super.dispose();
   }
@@ -80,12 +87,42 @@ class _HeroCarouselState extends State<HeroCarousel> {
     }
   }
 
+  void _cancelPoster() {
+    _posterTimer?.cancel();
+    _posterFor = null;
+    _posterOn = false;
+  }
+
   void _sync() {
     if (widget.slides.isEmpty || !widget.active) {
+      _cancelPoster();
       _setUrl(null);
       return;
     }
     final s = widget.slides[_i];
+    if (s.poster != null) {
+      if (_posterFor != s.id) {
+        // nuovo evento: prima la locandina, dopo 5 secondi parte l'anteprima
+        _posterTimer?.cancel();
+        _posterFor = s.id;
+        _posterOn = true;
+        _setUrl(null);
+        _posterTimer = Timer(const Duration(seconds: 5), () {
+          if (!mounted) return;
+          setState(() {
+            _posterOn = false;
+            _sync();
+          });
+        });
+        return;
+      }
+      if (_posterOn) {
+        _setUrl(null);
+        return;
+      }
+    } else {
+      _cancelPoster();
+    }
     if (s.preview != null) {
       _setUrl(s.preview!.url);
     } else if (s.previewLoader == null) {
@@ -220,6 +257,14 @@ class _HeroCarouselState extends State<HeroCarousel> {
               controls: NoVideoControls,
               fit: BoxFit.cover,
               fill: Colors.transparent,
+            ),
+          if (s.poster != null)
+            IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: _posterOn ? 1 : 0,
+                duration: const Duration(milliseconds: 700),
+                child: s.poster!(context),
+              ),
             ),
           DecoratedBox(
             decoration: BoxDecoration(

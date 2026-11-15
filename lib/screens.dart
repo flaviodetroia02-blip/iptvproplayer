@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'app_state.dart';
+import 'brand.dart';
 import 'models.dart';
 import 'player_screen.dart';
 import 'sports.dart';
@@ -54,6 +55,11 @@ void showChannelPicker(BuildContext context, AppState state, Fixture m) {
                       ),
                     ),
                     title: Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    trailing: resolutionLabel(c.name).isEmpty
+                        ? null
+                        : Text(resolutionLabel(c.name),
+                            style: const TextStyle(
+                                color: AppColors.accent, fontWeight: FontWeight.w800, fontSize: 12.5)),
                     onTap: () {
                       Navigator.pop(ctx);
                       state.setPreferred(m, c);
@@ -314,6 +320,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 shrinkWrap: true,
                 padding: const EdgeInsets.all(24),
                 children: [
+                  const BrandLogo(size: 30),
+                  const SizedBox(height: 28),
                   Text('Collega la tua playlist', style: Theme.of(context).textTheme.headlineMedium),
                   const SizedBox(height: 8),
                   Text('Inserisci il link M3U o i dati Xtream del tuo servizio.',

@@ -133,6 +133,29 @@ Future<List<Fixture>> fetchMatches() async {
   return all.take(30).toList();
 }
 
+/// Punteggio di risoluzione dal nome del canale: 4K, FHD, HD, senza indicazione, SD.
+int resolutionScore(String name) {
+  final n = name.toLowerCase();
+  if (RegExp(r'\b(4k|uhd|2160p?)\b').hasMatch(n)) return 4;
+  if (RegExp(r'\b(fhd|1080p?|full ?hd)\b').hasMatch(n)) return 3;
+  if (RegExp(r'\b(hd|720p?)\b').hasMatch(n)) return 2;
+  if (RegExp(r'\b(sd|480p?|576p?|360p?)\b').hasMatch(n)) return 0;
+  return 1;
+}
+
+String resolutionLabel(String name) {
+  switch (resolutionScore(name)) {
+    case 4:
+      return '4K';
+    case 3:
+      return 'FHD';
+    case 2:
+      return 'HD';
+    default:
+      return '';
+  }
+}
+
 /// Canali sportivi presenti nella playlist dell'utente, in ordine di probabilità.
 List<Item> sportsChannels(List<Item> live, String tag) {
   final keys = switch (tag) {
@@ -146,8 +169,11 @@ List<Item> sportsChannels(List<Item> live, String tag) {
     final idx = keys.indexWhere((k) => n.contains(k));
     if (idx >= 0) scored.add(MapEntry(idx, c));
   }
-  scored.sort((a, b) =>
-      a.key != b.key ? a.key.compareTo(b.key) : a.value.name.compareTo(b.value.name));
+  scored.sort((a, b) {
+    if (a.key != b.key) return a.key.compareTo(b.key);
+    final r = resolutionScore(b.value.name).compareTo(resolutionScore(a.value.name));
+    return r != 0 ? r : a.value.name.compareTo(b.value.name);
+  });
   return [for (final e in scored.take(16)) e.value];
 }
 
@@ -162,7 +188,10 @@ List<Item> popularChannels(List<Item> live) {
   for (final k in _popular) {
     final found = live.where((c) => c.name.toLowerCase().contains(k)).toList();
     if (found.isEmpty) continue;
-    found.sort((a, b) => a.name.length.compareTo(b.name.length));
+    found.sort((a, b) {
+      final r = resolutionScore(b.name).compareTo(resolutionScore(a.name));
+      return r != 0 ? r : a.name.length.compareTo(b.name.length);
+    });
     out.add(found.first);
   }
   return out;
