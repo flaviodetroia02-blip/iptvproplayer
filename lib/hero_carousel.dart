@@ -530,6 +530,10 @@ class _HeroCarouselState extends State<HeroCarousel> {
             bottom: nf ? 56 : 32,
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 250),
+              layoutBuilder: (current, previous) => Stack(
+                alignment: Alignment.bottomLeft,
+                children: [...previous, if (current != null) current],
+              ),
               child: Column(
                 key: ValueKey(_i),
                 crossAxisAlignment: CrossAxisAlignment.start,

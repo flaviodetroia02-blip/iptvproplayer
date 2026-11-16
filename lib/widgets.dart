@@ -1,6 +1,4 @@
-import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
-import 'device.dart';
 import 'models.dart';
 import 'theme.dart';
 
@@ -700,8 +698,7 @@ class EventPoster extends StatelessWidget {
   }
 }
 
-/// Locandina di film e serie: su schermi larghi poster nitido su sfondo sfocato,
-/// sul telefono locandina a tutto schermo.
+/// Locandina di film e serie: occupa tutta l'area dell'anteprima.
 class VodPoster extends StatelessWidget {
   final Item item;
   const VodPoster({super.key, required this.item});
@@ -709,46 +706,23 @@ class VodPoster extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final img = item.image;
-    final pad = sidePad(context);
-    return LayoutBuilder(builder: (context, box) {
-      final fallback = DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topRight,
-            end: Alignment.bottomLeft,
-            colors: [tone(item.name, lightness: 0.3), Colors.black],
-          ),
+    final fallback = DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [tone(item.name, lightness: 0.3), Colors.black],
         ),
-      );
-      if (img == null) return fallback;
-      Widget photo(BoxFit fit) =>
-          Image.network(img, fit: fit, alignment: Alignment.topCenter, errorBuilder: (_, __, ___) => fallback);
-      if (box.maxWidth < 700) {
-        return Stack(fit: StackFit.expand, children: [photo(BoxFit.cover), const ColoredBox(color: Color(0x55000000))]);
-      }
-      final h = box.maxHeight * 0.74;
-      return Stack(fit: StackFit.expand, children: [
-        fallback,
-        if (!Device.lowEnd)
-          ImageFiltered(imageFilter: ImageFilter.blur(sigmaX: 36, sigmaY: 36), child: photo(BoxFit.cover)),
-        const ColoredBox(color: Color(0x88000000)),
-        Positioned(
-          right: pad * 2,
-          top: box.maxHeight * 0.08,
-          height: h,
-          child: AspectRatio(
-            aspectRatio: 2 / 3,
-            child: Container(
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: const [BoxShadow(color: Color(0x99000000), blurRadius: 40, offset: Offset(0, 16))],
-              ),
-              child: photo(BoxFit.cover),
-            ),
-          ),
-        ),
-      ]);
-    });
+      ),
+    );
+    if (img == null) return fallback;
+    return Stack(fit: StackFit.expand, children: [
+      fallback,
+      Image.network(img,
+          fit: BoxFit.cover,
+          alignment: const Alignment(0, -0.25),
+          errorBuilder: (_, __, ___) => fallback),
+      const ColoredBox(color: Color(0x44000000)),
+    ]);
   }
 }
