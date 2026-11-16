@@ -18,12 +18,47 @@ jobs:
         with:
           channel: stable
       - run: flutter create . --platforms=android
-      - name: Permesso rete e traffico http
+      - name: Chiave di firma stabile (serve per aggiornare l'app)
+        env:
+          KS: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
         run: |
-          f=android/app/src/main/AndroidManifest.xml
-          sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application android:usesCleartextTraffic="true"#' $f
+          if [ -n "$KS" ]; then
+            mkdir -p ~/.android
+            echo "$KS" | base64 -d > ~/.android/debug.keystore
+          else
+            echo "Chiave non impostata: gli aggiornamenti in app non funzioneranno"
+          fi
+      - name: Icona, banner TV, permessi e Android 5
+        run: |
+          cp -r branding/android/* android/app/src/main/res/
+          python3 - <<'PY'
+          import re
+          p = 'android/app/src/main/AndroidManifest.xml'
+          t = open(p, encoding='utf-8').read()
+          t = re.sub(r'android:label="[^"]*"', 'android:label="PRIMA"', t, count=1)
+          perms = ('<uses-permission android:name="android.permission.INTERNET"/>\n'
+                   '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>\n'
+                   '    <uses-feature android:name="android.software.leanback" android:required="false"/>\n'
+                   '    <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>\n    ')
+          t = t.replace('<application', perms + '<application android:usesCleartextTraffic="true" android:banner="@drawable/tv_banner"', 1)
+          t = t.replace('<category android:name="android.intent.category.LAUNCHER"/>',
+                        '<category android:name="android.intent.category.LAUNCHER"/>\n                <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>', 1)
+          open(p, 'w', encoding='utf-8').write(t)
+          PY
+          for f in android/app/build.gradle.kts android/app/build.gradle; do
+            if [ -f "$f" ]; then
+              sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/; s/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' "$f"
+            fi
+          done
       - run: flutter pub get
-      - run: flutter build apk --release
+      - name: Compila APK (con nuovi tentativi)
+        run: |
+          for i in 1 2 3; do
+            flutter build apk --release --dart-define=BUILD_NUMBER=${{ github.run_number }} && exit 0
+            echo "Tentativo $i fallito, riprovo..."
+            sleep 20
+          done
+          exit 1
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
@@ -38,8 +73,29 @@ jobs:
           channel: stable
       - run: flutter create . --platforms=windows
       - run: flutter pub get
-      - run: flutter build windows --release
+      - run: flutter build windows --release --dart-define=BUILD_NUMBER=${{ github.run_number }}
       - uses: actions/upload-artifact@v4
         with:
           name: windows-app
           path: build/windows/x64/runner/Release
+
+  release:
+    needs: [android, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Prepara i file
+        run: |
+          cp artifacts/android-apk/app-release.apk PRIMA.apk
+          cd artifacts/windows-app && zip -r ../../PRIMA-windows.zip . && cd ../..
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: PRIMA build ${{ github.run_number }}
+          files: |
+            PRIMA.apk
+            PRIMA-windows.zip
