@@ -1,0 +1,26 @@
+name: Build web app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter create . --platforms=web
+      - name: Nome e colori dell'app web
+        run: |
+          sed -i 's/iptv_player/PRIMA/g; s/"background_color": "#[0-9A-Fa-f]*"/"background_color": "#000000"/; s/"theme_color": "#[0-9A-Fa-f]*"/"theme_color": "#E5173F"/' web/manifest.json
+          sed -i 's#<title>[^<]*</title>#<title>PRIMA</title>#; s/content="iptv_player"/content="PRIMA"/' web/index.html
+      - run: flutter pub get
+      - run: flutter build web --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-app
+          path: build/web
