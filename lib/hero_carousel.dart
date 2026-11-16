@@ -164,6 +164,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
     final s = widget.slides[_i.clamp(0, n - 1)];
     final text = Theme.of(context).textTheme;
     final nf = widget.netflix;
+    final narrow = MediaQuery.of(context).size.width < 700;
     final screenH = MediaQuery.of(context).size.height;
     final height = (screenH * (nf ? 0.62 : 0.5)).clamp(420.0, 640.0).toDouble();
     final round = IconButton.styleFrom(backgroundColor: const Color(0x88000000));
@@ -186,7 +187,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
             ),
           ]);
 
-    final buttons = Row(children: [
+    final buttons = Wrap(spacing: 12, runSpacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: [
       FilledButton.icon(
         onPressed: s.onWatch,
         icon: const Icon(Icons.play_arrow_rounded),
@@ -199,7 +200,6 @@ class _HeroCarouselState extends State<HeroCarousel> {
         ),
       ),
       if (s.onChange != null) ...[
-        const SizedBox(width: 12),
         if (nf)
           FilledButton.icon(
             onPressed: s.onChange,
@@ -224,6 +224,40 @@ class _HeroCarouselState extends State<HeroCarousel> {
           ),
       ],
     ]);
+
+    final controls = Row(mainAxisSize: MainAxisSize.min, children: [
+              if (_url != null)
+                IconButton(
+                  tooltip: _muted ? 'Attiva audio' : 'Disattiva audio',
+                  onPressed: _toggleSound,
+                  icon: Icon(_muted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
+                  style: round,
+                ),
+              if (n > 1) ...[
+                const SizedBox(width: 10),
+                IconButton(
+                    onPressed: () => _go(-1),
+                    icon: const Icon(Icons.chevron_left_rounded),
+                    style: round),
+                const SizedBox(width: 6),
+                for (var k = 0; k < n; k++)
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: k == _i ? 18 : 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: k == _i ? AppColors.accent : const Color(0x66FFFFFF),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                const SizedBox(width: 6),
+                IconButton(
+                    onPressed: () => _go(1),
+                    icon: const Icon(Icons.chevron_right_rounded),
+                    style: round),
+              ],
+]);
 
     return SizedBox(
       height: height,
@@ -304,7 +338,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
                     child: Text(s.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: text.headlineMedium?.copyWith(fontSize: nf ? 46 : 36)),
+                        style: text.headlineMedium?.copyWith(fontSize: narrow ? (nf ? 34 : 28) : (nf ? 46 : 36))),
                   ),
                   const SizedBox(height: 8),
                   Row(mainAxisSize: MainAxisSize.min, children: [
@@ -317,47 +351,13 @@ class _HeroCarouselState extends State<HeroCarousel> {
                   ]),
                   const SizedBox(height: 20),
                   buttons,
+                  if (narrow) ...[const SizedBox(height: 14), controls],
                 ],
               ),
             ),
           ),
-          Positioned(
-            right: 24,
-            bottom: nf ? 56 : 32,
-            child: Row(children: [
-              if (_url != null)
-                IconButton(
-                  tooltip: _muted ? 'Attiva audio' : 'Disattiva audio',
-                  onPressed: _toggleSound,
-                  icon: Icon(_muted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
-                  style: round,
-                ),
-              if (n > 1) ...[
-                const SizedBox(width: 10),
-                IconButton(
-                    onPressed: () => _go(-1),
-                    icon: const Icon(Icons.chevron_left_rounded),
-                    style: round),
-                const SizedBox(width: 6),
-                for (var k = 0; k < n; k++)
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
-                    width: k == _i ? 18 : 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: k == _i ? AppColors.accent : const Color(0x66FFFFFF),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                const SizedBox(width: 6),
-                IconButton(
-                    onPressed: () => _go(1),
-                    icon: const Icon(Icons.chevron_right_rounded),
-                    style: round),
-              ],
-            ]),
-          ),
+          if (!narrow)
+            Positioned(right: 24, bottom: nf ? 56 : 32, child: controls),
         ]),
       ),
     );
