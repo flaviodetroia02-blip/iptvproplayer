@@ -30,6 +30,13 @@ ThemeData buildTheme() {
           titleMedium: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           bodySmall: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
         ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: ButtonStyle(
+        side: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.focused) ? const BorderSide(color: Colors.white, width: 3) : null,
+        ),
+      ),
+    ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: AppColors.surface,

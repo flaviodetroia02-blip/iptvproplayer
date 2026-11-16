@@ -1,4 +1,6 @@
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
+import 'device.dart';
 import 'models.dart';
 import 'theme.dart';
 
@@ -6,6 +8,18 @@ Color tone(String seed, {double lightness = 0.28}) {
   final h = seed.codeUnits.fold<int>(0, (a, b) => (a * 31 + b) % 360);
   return HSLColor.fromAHSL(1, h.toDouble(), 0.35, lightness).toColor();
 }
+
+/// Fattore di ingrandimento per schermi grandi (PC e TV).
+double uiScale(BuildContext c) {
+  final w = MediaQuery.of(c).size.width;
+  if (w >= 1700) return 1.35;
+  if (w >= 1300) return 1.2;
+  if (w >= 1000) return 1.1;
+  return 1;
+}
+
+/// Margine laterale che cresce con la larghezza della finestra.
+double sidePad(BuildContext c) => (MediaQuery.of(c).size.width * 0.03).clamp(20.0, 64.0).toDouble();
 
 /// Immagine con sfondo sfumato di riserva (se manca o non carica).
 class Art extends StatelessWidget {
@@ -133,7 +147,7 @@ class LiveCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 260,
+      width: 260 * uiScale(context),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
         FocusTile(
           onTap: onTap,
@@ -181,7 +195,7 @@ class PosterCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = progress;
     return SizedBox(
-      width: 150,
+      width: 150 * uiScale(context),
       child: FocusTile(
         radius: 6,
         scale: 1.08,
@@ -299,7 +313,7 @@ class _RailState extends State<Rail> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (widget.title.isNotEmpty)
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 26, 16, 0),
+          padding: EdgeInsets.fromLTRB(sidePad(context), 26, 16, 0),
           child: Row(children: [
             Expanded(
               child: Text(widget.title,
@@ -324,7 +338,7 @@ class _RailState extends State<Rail> {
           ListView.builder(
             controller: _c,
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            padding: EdgeInsets.symmetric(horizontal: sidePad(context), vertical: 14),
             itemCount: widget.children.length,
             itemBuilder: (_, i) =>
                 Padding(padding: const EdgeInsets.only(right: 14), child: widget.children[i]),
@@ -360,7 +374,7 @@ class DayTabs extends StatelessWidget {
       height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        padding: EdgeInsets.symmetric(horizontal: sidePad(context)),
         itemCount: labels.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (_, i) => ChoiceChip(
@@ -395,7 +409,7 @@ class GenreChips extends StatelessWidget {
       height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        padding: EdgeInsets.symmetric(horizontal: sidePad(context)),
         itemCount: groups.length + 1,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
@@ -464,7 +478,7 @@ class MatchCard extends StatelessWidget {
           ),
         ]);
     return Container(
-      width: 300,
+      width: 300 * uiScale(context),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -683,5 +697,58 @@ class EventPoster extends StatelessWidget {
         ),
       ),
     ]);
+  }
+}
+
+/// Locandina di film e serie: su schermi larghi poster nitido su sfondo sfocato,
+/// sul telefono locandina a tutto schermo.
+class VodPoster extends StatelessWidget {
+  final Item item;
+  const VodPoster({super.key, required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final img = item.image;
+    final pad = sidePad(context);
+    return LayoutBuilder(builder: (context, box) {
+      final fallback = DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [tone(item.name, lightness: 0.3), Colors.black],
+          ),
+        ),
+      );
+      if (img == null) return fallback;
+      Widget photo(BoxFit fit) =>
+          Image.network(img, fit: fit, alignment: Alignment.topCenter, errorBuilder: (_, __, ___) => fallback);
+      if (box.maxWidth < 700) {
+        return Stack(fit: StackFit.expand, children: [photo(BoxFit.cover), const ColoredBox(color: Color(0x55000000))]);
+      }
+      final h = box.maxHeight * 0.74;
+      return Stack(fit: StackFit.expand, children: [
+        fallback,
+        if (!Device.lowEnd)
+          ImageFiltered(imageFilter: ImageFilter.blur(sigmaX: 36, sigmaY: 36), child: photo(BoxFit.cover)),
+        const ColoredBox(color: Color(0x88000000)),
+        Positioned(
+          right: pad * 2,
+          top: box.maxHeight * 0.08,
+          height: h,
+          child: AspectRatio(
+            aspectRatio: 2 / 3,
+            child: Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: const [BoxShadow(color: Color(0x99000000), blurRadius: 40, offset: Offset(0, 16))],
+              ),
+              child: photo(BoxFit.cover),
+            ),
+          ),
+        ),
+      ]);
+    });
   }
 }

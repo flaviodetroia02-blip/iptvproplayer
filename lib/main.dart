@@ -7,6 +7,8 @@ import 'package:window_manager/window_manager.dart';
 import 'app_state.dart';
 import 'brand.dart';
 import 'browse.dart';
+import 'device.dart';
+import 'updater.dart';
 import 'models.dart';
 import 'premium_nav.dart';
 import 'screens.dart';
@@ -22,6 +24,7 @@ Future<void> toggleFullScreen() async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
+  await Device.init();
   if (_desktop) {
     await windowManager.ensureInitialized();
     await windowManager.waitUntilReadyToShow(
@@ -129,6 +132,19 @@ class _ShellState extends State<Shell> {
               widget.state.logout();
             },
           ),
+          StatefulBuilder(
+            builder: (c, setS) => SwitchListTile(
+              secondary: const Icon(Icons.play_circle_outline_rounded),
+              title: const Text('Anteprime video'),
+              subtitle: const Text('Disattivale se l\'app è lenta'),
+              value: widget.state.previews,
+              activeColor: AppColors.accent,
+              onChanged: (v) {
+                widget.state.setPreviews(v);
+                setS(() {});
+              },
+            ),
+          ),
           if (_desktop)
             ListTile(
               leading: const Icon(Icons.fullscreen_rounded),
@@ -140,7 +156,7 @@ class _ShellState extends State<Shell> {
             ),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 4, 16, 14),
-            child: Text('Versione 0.5',
+            child: Text('Versione 0.6${kBuild > 0 ? ' (build $kBuild)' : ''}',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
           ),
         ]),
@@ -177,6 +193,15 @@ class _ShellState extends State<Shell> {
                   s.setTab(i);
                 },
               ),
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.topCenter,
+          child: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(top: wide ? 84 : 8, left: 16, right: 16),
+              child: const UpdateBanner(),
             ),
           ),
         ),

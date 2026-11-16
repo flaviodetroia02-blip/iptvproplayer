@@ -70,6 +70,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
               : null,
           onWatch: () => openItem(context, state, i),
           onChange: () => showInfo(context, state, i),
+          poster: (ctx) => VodPoster(item: i),
         ),
     ];
   }
@@ -145,7 +146,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
     if (_group != null && !groups.containsKey(_group)) _group = null;
     final favs = live ? state.favoriteLive : <Item>[];
     final recents = state.recents.where((i) => i.kind == kind).toList();
-    final h = live ? 224.0 : 262.0;
+    final sc = uiScale(context);
+    final h = live ? 260 * sc * 9 / 16 + 78 : 150 * sc * 1.5 + 40;
 
     Widget card(Item i) => live
         ? LiveCard(
@@ -171,7 +173,12 @@ class _BrowseScreenState extends State<BrowseScreen> {
     );
     final slides = _slides(context);
     if (slides.isNotEmpty) {
-      hero = HeroCarousel(slides: slides, active: state.heroActiveFor(kind.index), netflix: !live);
+      hero = HeroCarousel(
+        slides: slides,
+        active: state.heroActiveFor(kind.index),
+        netflix: !live,
+        previews: state.previews,
+      );
     }
 
     final slivers = <Widget>[SliverToBoxAdapter(child: hero)];
@@ -196,7 +203,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
       slivers.add(SliverToBoxAdapter(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 26, 24, 10),
+            padding: EdgeInsets.fromLTRB(sidePad(context), 26, 24, 10),
             child: Text('Calendario calcio', style: Theme.of(context).textTheme.titleMedium),
           ),
           DayTabs(
@@ -250,7 +257,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
         ));
       }
       slivers.add(SliverPadding(
-        padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+        padding: EdgeInsets.fromLTRB(sidePad(context), 18, sidePad(context), 0),
         sliver: SliverGrid(
           gridDelegate: live
               ? const SliverGridDelegateWithMaxCrossAxisExtent(

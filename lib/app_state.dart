@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'device.dart';
 import 'm3u.dart';
 import 'models.dart';
 import 'sports.dart';
@@ -19,6 +20,7 @@ class AppState extends ChangeNotifier {
   Map<String, int> positions = {};
   Map<String, int> durations = {};
   Map<String, String> prefChannel = {};
+  bool previews = true;
   int tab = 0;
   int _routes = 0;
 
@@ -35,6 +37,7 @@ class AppState extends ChangeNotifier {
     if (dur != null) {
       durations = (jsonDecode(dur) as Map<String, dynamic>).map((k, v) => MapEntry(k, v as int));
     }
+    previews = _prefs.getBool('previews') ?? !Device.lowEnd;
     final lc = _prefs.getString('lc');
     if (lc != null) prefChannel = (jsonDecode(lc) as Map<String, dynamic>).map((k, v) => MapEntry(k, v as String));
     final p = _prefs.getString('pos');
@@ -108,6 +111,12 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  void setPreviews(bool v) {
+    previews = v;
+    _prefs.setBool('previews', v);
+    notifyListeners();
   }
 
   /// L'anteprima parte solo nella scheda visibile e quando non c'è altro in primo piano.

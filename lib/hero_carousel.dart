@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'device.dart';
 import 'models.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -36,7 +37,14 @@ class HeroCarousel extends StatefulWidget {
   final List<HeroSlide> slides;
   final bool active;
   final bool netflix; // variante film e serie
-  const HeroCarousel({super.key, required this.slides, required this.active, this.netflix = false});
+  final bool previews; // anteprime video attive
+  const HeroCarousel({
+    super.key,
+    required this.slides,
+    required this.active,
+    this.netflix = false,
+    this.previews = true,
+  });
 
   @override
   State<HeroCarousel> createState() => _HeroCarouselState();
@@ -100,6 +108,14 @@ class _HeroCarouselState extends State<HeroCarousel> {
       return;
     }
     final s = widget.slides[_i];
+    if (!widget.previews) {
+      // anteprime video spente: resta solo la locandina
+      _posterTimer?.cancel();
+      _posterFor = null;
+      _posterOn = s.poster != null;
+      _setUrl(null);
+      return;
+    }
     if (s.poster != null) {
       if (_posterFor != s.id) {
         // nuovo evento: prima la locandina, dopo 5 secondi parte l'anteprima
@@ -107,6 +123,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
         _posterFor = s.id;
         _posterOn = true;
         _setUrl(null);
+        if (s.preview == null && s.previewLoader != null && !_cache.containsKey(s.id)) _resolve(s);
         _posterTimer = Timer(const Duration(seconds: 5), () {
           if (!mounted) return;
           setState(() {
@@ -158,6 +175,188 @@ class _HeroCarouselState extends State<HeroCarousel> {
     _sync();
   }
 
+  /// Versione per telefono: scheda arrotondata, titolo grande, un solo tasto principale
+  /// a tutta larghezza e indicatori a segmenti in basso. Si scorre col dito.
+  Widget _buildNarrow(BuildContext context, HeroSlide s, bool nf) {
+    final n = widget.slides.length;
+    final text = Theme.of(context).textTheme;
+    final mq = MediaQuery.of(context);
+    final height = (mq.size.height * 0.56).clamp(400.0, 540.0).toDouble();
+    final base = nf ? Colors.black : AppColors.background;
+
+    final badge = nf
+        ? Text(s.badge.toUpperCase(),
+            style: const TextStyle(
+                color: AppColors.accent, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 3))
+        : Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: s.live ? AppColors.accent : const Color(0x33FFFFFF),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(s.badge,
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+          );
+
+    final primary = FilledButton.icon(
+      onPressed: s.onWatch,
+      icon: const Icon(Icons.play_arrow_rounded, size: 26),
+      label: Text(nf ? 'Riproduci' : 'Guarda ora'),
+      style: FilledButton.styleFrom(
+        backgroundColor: nf ? Colors.white : AppColors.accent,
+        foregroundColor: nf ? Colors.black : Colors.white,
+        minimumSize: const Size.fromHeight(52),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+      ),
+    );
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12, mq.padding.top + 10, 12, 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(26),
+        child: SizedBox(
+          height: height,
+          child: GestureDetector(
+            onHorizontalDragEnd: (d) {
+              final v = d.primaryVelocity ?? 0;
+              if (v < -250) {
+                _go(1);
+              } else if (v > 250) {
+                _go(-1);
+              }
+            },
+            child: Stack(fit: StackFit.expand, children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [tone(s.title, lightness: 0.34), base],
+                  ),
+                ),
+              ),
+              if (s.image != null)
+                Image.network(s.image!,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+              if (_url != null)
+                Video(
+                  controller: _video,
+                  controls: NoVideoControls,
+                  fit: BoxFit.cover,
+                  fill: Colors.transparent,
+                ),
+              if (s.poster != null)
+                IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: _posterOn ? 1 : 0,
+                    duration: const Duration(milliseconds: 700),
+                    child: s.poster!(context),
+                  ),
+                ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [const Color(0x55000000), const Color(0x00000000), base.withAlpha(0xF2)],
+                    stops: const [0, 0.4, 1],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 12,
+                top: 12,
+                child: _url == null
+                    ? const SizedBox.shrink()
+                    : IconButton(
+                        tooltip: _muted ? 'Attiva audio' : 'Disattiva audio',
+                        onPressed: _toggleSound,
+                        icon: Icon(_muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                            size: 22),
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0x66000000),
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+              ),
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: 30,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: Column(
+                    key: ValueKey(_i),
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      badge,
+                      const SizedBox(height: 10),
+                      Text(s.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.headlineMedium?.copyWith(fontSize: 30, height: 1.05)),
+                      const SizedBox(height: 6),
+                      Text(s.subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.bodySmall?.copyWith(color: const Color(0xCCFFFFFF))),
+                      const SizedBox(height: 16),
+                      Row(children: [
+                        Expanded(child: primary),
+                        if (s.onChange != null) ...[
+                          const SizedBox(width: 10),
+                          SizedBox(
+                            width: 52,
+                            height: 52,
+                            child: IconButton(
+                              tooltip: nf ? 'Altre info' : 'Cambia canale',
+                              onPressed: s.onChange,
+                              icon: Icon(nf ? Icons.info_outline_rounded : Icons.swap_horiz_rounded),
+                              style: IconButton.styleFrom(
+                                backgroundColor: const Color(0x33FFFFFF),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ]),
+                    ],
+                  ),
+                ),
+              ),
+              if (n > 1)
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  bottom: 14,
+                  child: Row(children: [
+                    for (var k = 0; k < n; k++)
+                      Expanded(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          height: 3,
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          decoration: BoxDecoration(
+                            color: k == _i ? Colors.white : const Color(0x44FFFFFF),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                  ]),
+                ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final n = widget.slides.length;
@@ -165,8 +364,11 @@ class _HeroCarouselState extends State<HeroCarousel> {
     final text = Theme.of(context).textTheme;
     final nf = widget.netflix;
     final narrow = MediaQuery.of(context).size.width < 700;
+    final sc = uiScale(context);
+    final pad = sidePad(context);
+    if (narrow) return _buildNarrow(context, s, nf);
     final screenH = MediaQuery.of(context).size.height;
-    final height = (screenH * (nf ? 0.62 : 0.5)).clamp(420.0, 640.0).toDouble();
+    final height = (screenH * (nf ? 0.62 : 0.5)).clamp(420.0, 720.0).toDouble();
     final round = IconButton.styleFrom(backgroundColor: const Color(0x88000000));
     final base = nf ? Colors.black : AppColors.background;
 
@@ -189,6 +391,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
 
     final buttons = Wrap(spacing: 12, runSpacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: [
       FilledButton.icon(
+        autofocus: Device.isTv,
         onPressed: s.onWatch,
         icon: const Icon(Icons.play_arrow_rounded),
         label: Text(nf ? 'Riproduci' : 'Guarda ora'),
@@ -280,7 +483,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
               ),
             ),
           ),
-          if (s.image != null)
+          if (s.image != null && s.poster == null)
             Image.network(s.image!,
                 fit: BoxFit.cover,
                 alignment: Alignment.topCenter,
@@ -322,8 +525,8 @@ class _HeroCarouselState extends State<HeroCarousel> {
               ),
             ),
           Positioned(
-            left: 24,
-            right: 24,
+            left: pad,
+            right: pad,
             bottom: nf ? 56 : 32,
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 250),
@@ -338,7 +541,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
                     child: Text(s.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: text.headlineMedium?.copyWith(fontSize: narrow ? (nf ? 34 : 28) : (nf ? 46 : 36))),
+                        style: text.headlineMedium?.copyWith(fontSize: narrow ? (nf ? 34 : 28) : (nf ? 46 : 36) * sc)),
                   ),
                   const SizedBox(height: 8),
                   Row(mainAxisSize: MainAxisSize.min, children: [
@@ -357,7 +560,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
             ),
           ),
           if (!narrow)
-            Positioned(right: 24, bottom: nf ? 56 : 32, child: controls),
+            Positioned(right: pad, bottom: nf ? 56 : 32, child: controls),
         ]),
       ),
     );
