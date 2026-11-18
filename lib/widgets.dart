@@ -8,12 +8,13 @@ Color tone(String seed, {double lightness = 0.28}) {
 }
 
 /// Fattore di ingrandimento per schermi grandi (PC e TV).
+double uiFactor = 1.0;
+void setUiFactor(double v) => uiFactor = v;
+
 double uiScale(BuildContext c) {
   final w = MediaQuery.of(c).size.width;
-  if (w >= 1700) return 1.35;
-  if (w >= 1300) return 1.2;
-  if (w >= 1000) return 1.1;
-  return 1;
+  final base = w >= 1700 ? 1.35 : (w >= 1300 ? 1.2 : (w >= 1000 ? 1.1 : 1.0));
+  return base * uiFactor;
 }
 
 /// Margine laterale che cresce con la larghezza della finestra.

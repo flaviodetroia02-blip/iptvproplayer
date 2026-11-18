@@ -156,6 +156,16 @@ String resolutionLabel(String name) {
   }
 }
 
+/// Nome "pulito" di un canale, senza etichette di risoluzione: serve a trovare
+/// la stessa emittente in versione 4K, FHD, HD o SD.
+String baseKey(String name) {
+  var n = name.toLowerCase();
+  n = n.replaceAll(RegExp(r'[\[\(\{][^\]\)\}]*[\]\)\}]'), ' ');
+  n = n.replaceAll(RegExp(r'\b(4k|uhd|2160p?|fhd|1080[pi]?|full ?hd|hd|720p?|sd|576p?|480p?|360p?|hevc|h\.?26[45]|\d+ ?fps|raw|backup)\b'), ' ');
+  n = n.replaceAll(RegExp(r'^[a-z]{2,3}\s*[:|]\s*'), '');
+  return n.replaceAll(RegExp(r'[^a-z0-9+]+'), ' ').trim();
+}
+
 /// Canali sportivi presenti nella playlist dell'utente, in ordine di probabilità.
 List<Item> sportsChannels(List<Item> live, String tag) {
   final keys = switch (tag) {

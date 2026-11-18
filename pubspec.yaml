@@ -1,7 +1,7 @@
 name: iptv_player
 description: Player IPTV multipiattaforma con interfaccia scura e accento rosso.
 publish_to: "none"
-version: 0.6.0
+version: 0.7.0
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

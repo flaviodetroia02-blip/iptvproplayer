@@ -38,12 +38,16 @@ class HeroCarousel extends StatefulWidget {
   final bool active;
   final bool netflix; // variante film e serie
   final bool previews; // anteprime video attive
+  final bool startMuted;
+  final int posterSeconds;
   const HeroCarousel({
     super.key,
     required this.slides,
     required this.active,
     this.netflix = false,
     this.previews = true,
+    this.startMuted = true,
+    this.posterSeconds = 5,
   });
 
   @override
@@ -55,7 +59,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
   late final VideoController _video = VideoController(_player);
   int _i = 0;
   String? _url;
-  bool _muted = true;
+  late bool _muted = widget.startMuted;
   String? _posterFor;
   bool _posterOn = false;
   Timer? _posterTimer;
@@ -124,7 +128,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
         _posterOn = true;
         _setUrl(null);
         if (s.preview == null && s.previewLoader != null && !_cache.containsKey(s.id)) _resolve(s);
-        _posterTimer = Timer(const Duration(seconds: 5), () {
+        _posterTimer = Timer(Duration(seconds: widget.posterSeconds), () {
           if (!mounted) return;
           setState(() {
             _posterOn = false;

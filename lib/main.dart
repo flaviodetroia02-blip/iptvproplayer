@@ -11,6 +11,7 @@ import 'device.dart';
 import 'updater.dart';
 import 'models.dart';
 import 'premium_nav.dart';
+import 'settings_screen.dart';
 import 'screens.dart';
 import 'theme.dart';
 
@@ -111,57 +112,14 @@ class _ShellState extends State<Shell> {
   ];
 
   void _settings() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      builder: (ctx) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          ListTile(
-            leading: const Icon(Icons.refresh_rounded),
-            title: const Text('Aggiorna playlist'),
-            onTap: () {
-              Navigator.pop(ctx);
-              widget.state.reload();
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.logout_rounded),
-            title: const Text('Esci dal servizio'),
-            onTap: () {
-              Navigator.pop(ctx);
-              widget.state.logout();
-            },
-          ),
-          StatefulBuilder(
-            builder: (c, setS) => SwitchListTile(
-              secondary: const Icon(Icons.play_circle_outline_rounded),
-              title: const Text('Anteprime video'),
-              subtitle: const Text('Disattivale se l\'app è lenta'),
-              value: widget.state.previews,
-              activeColor: AppColors.accent,
-              onChanged: (v) {
-                widget.state.setPreviews(v);
-                setS(() {});
-              },
-            ),
-          ),
-          if (_desktop)
-            ListTile(
-              leading: const Icon(Icons.fullscreen_rounded),
-              title: const Text('Schermo intero (F11)'),
-              onTap: () {
-                Navigator.pop(ctx);
-                toggleFullScreen();
-              },
-            ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 4, 16, 14),
-            child: Text('Versione 0.6${kBuild > 0 ? ' (build $kBuild)' : ''}',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
-          ),
-        ]),
+    final s = widget.state;
+    s.routePush();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(state: s, onFullScreen: _desktop ? toggleFullScreen : null),
       ),
-    );
+    ).then((_) => s.routePop());
   }
 
   @override

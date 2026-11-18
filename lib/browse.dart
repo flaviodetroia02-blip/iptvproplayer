@@ -3,6 +3,7 @@ import 'app_state.dart';
 import 'hero_carousel.dart';
 import 'models.dart';
 import 'screens.dart';
+import 'settings_screen.dart';
 import 'sports.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -77,6 +78,19 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   List<HeroSlide> _slides(BuildContext context) {
     if (kind != Kind.live) return _vodSlides(context);
+    final mine = [
+      for (final c in state.heroChannels)
+        HeroSlide(
+          id: c.id,
+          badge: 'I miei canali',
+          title: c.name,
+          subtitle: c.group,
+          live: false,
+          preview: c,
+          onWatch: () => openItem(context, state, c),
+        ),
+    ];
+    if (state.heroMode == 2 && mine.isNotEmpty) return mine;
     final out = <HeroSlide>[];
     for (final m in state.matches.take(8)) {
       final best = state.bestChannel(m);
@@ -94,6 +108,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
         poster: (ctx) => EventPoster(match: m),
       ));
     }
+    if (state.heroMode == 1) out.addAll(mine);
     if (out.isEmpty) {
       for (final c in popularChannels(state.live).take(6)) {
         out.add(HeroSlide(
@@ -135,6 +150,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
                   if (state.error != null) ...[
                     const SizedBox(height: 16),
                     FilledButton(onPressed: () => state.reload(), child: const Text('Riprova')),
+                    TextButton(
+                      onPressed: () => showDialog(context: context, builder: (_) => DiagnosticsDialog(state: state)),
+                      child: const Text('Diagnostica connessione'),
+                    ),
                   ],
                 ]),
               ),
@@ -178,6 +197,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
         active: state.heroActiveFor(kind.index),
         netflix: !live,
         previews: state.previews,
+        startMuted: !state.heroSound,
+        posterSeconds: state.posterSecs,
       );
     }
 
