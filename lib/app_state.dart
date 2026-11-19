@@ -8,6 +8,7 @@ import 'm3u.dart';
 import 'models.dart';
 import 'net.dart';
 import 'sports.dart';
+import 'team_alerts.dart';
 import 'widgets.dart' show setUiFactor;
 import 'xtream.dart';
 
@@ -31,12 +32,13 @@ class AppState extends ChangeNotifier {
   int cacheTime = 0;
   Map<String, Item> _liveById = {};
 
-  // impostazioni
   bool previews = true, heroSound = false, slowWarn = true;
   int posterSecs = 5, heroMode = 0, fitMode = 0, bufferMode = 1, uiSize = 1, refreshHours = 6;
   List<String> heroIds = [];
 
-  // misura della connessione
+  String? favoriteTeam;
+  bool nationalTeam = false;
+
   double? mbps;
   DateTime? _mbpsAt;
 
@@ -75,10 +77,14 @@ class AppState extends ChangeNotifier {
     heroIds = _prefs.getStringList('heroIds') ?? [];
     cacheTime = _prefs.getInt('cacheTime') ?? 0;
 
+    final ft = _prefs.getString('favTeam');
+    if (ft != null && ft.isNotEmpty) favoriteTeam = ft;
+    nationalTeam = _prefs.getBool('nazionale') ?? false;
+
     final saved = _prefs.getString('source');
     if (saved != null) {
       source = jsonDecode(saved) as Map<String, dynamic>;
-      final c = await loadCache(_key(source!)); // apertura immediata dalla copia locale
+      final c = await loadCache(_key(source!));
       if (c != null) {
         live = c.live;
         movies = c.movies;
@@ -127,7 +133,7 @@ class AppState extends ChangeNotifier {
       List<Item> l, m, se;
       if (s['type'] == 'm3u') {
         final bytes = await fetchBytes(Uri.parse(s['url'] as String), idle: const Duration(seconds: 45));
-        final all = await compute(_parseM3uBytes, bytes); // lettura fuori dal thread principale
+        final all = await compute(_parseM3uBytes, bytes);
         l = all.where((i) => i.kind == Kind.live).toList();
         m = all.where((i) => i.kind == Kind.movie).toList();
         se = all.where((i) => i.kind == Kind.series).toList();
@@ -167,7 +173,7 @@ class AppState extends ChangeNotifier {
       if (live.isEmpty && movies.isEmpty && series.isEmpty) {
         error = msg;
       } else {
-        refreshError = msg; // restano i dati salvati
+        refreshError = msg;
       }
       loading = false;
       notifyListeners();
@@ -200,13 +206,25 @@ class AppState extends ChangeNotifier {
 
   List<Item> get favoriteLive => live.where(isFav).toList();
 
+  List<Item> get resumeList {
+    final out = <Item>[];
+    for (final r in recents) {
+      if (r.kind == Kind.live) {
+        out.add(r);
+      } else if (positionOf(r.url) > 10) {
+        out.add(r);
+      }
+      if (out.length >= 8) break;
+    }
+    return out;
+  }
+
   Future<List<Episode>> episodes(Item s) {
     final x = XtreamClient(
         source!['server'] as String, source!['user'] as String, source!['pass'] as String);
     return x.episodes(s.seriesId!);
   }
 
-  // ---- anteprime e scheda attiva ----
   bool heroActiveFor(int t) => tab == t && _routes == 0;
 
   void setTab(int i) {
@@ -226,7 +244,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ---- canali per le partite ----
   bool hasPreferred(Fixture m) => _preferred(m) != null;
 
   Item? _preferred(Fixture m) {
@@ -250,10 +267,10 @@ class AppState extends ChangeNotifier {
     fetchMatches().then((m) {
       matches = m;
       notifyListeners();
+      TeamAlerts.check(this);
     });
   }
 
-  // ---- cronologia ----
   void markWatched(Item i) {
     recents.removeWhere((r) => r.id == i.id);
     recents.insert(0, i);
@@ -300,8 +317,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ---- qualità e connessione ----
-  /// Versione dello stesso canale con risoluzione inferiore, se presente nella playlist.
   Item? lowerVariant(Item cur) {
     final key = baseKey(cur.name);
     if (key.isEmpty) return null;
@@ -335,7 +350,6 @@ class AppState extends ChangeNotifier {
   int get bufferMb => Device.lowEnd ? 32 : const [32, 96, 192][bufferMode.clamp(0, 2)];
   int get readaheadSecs => const [20, 40, 60][bufferMode.clamp(0, 2)];
 
-  // ---- impostazioni ----
   List<Item> get heroChannels => [
         for (final id in heroIds)
           if (_liveById[id] != null) _liveById[id]!,
@@ -370,5 +384,23 @@ class AppState extends ChangeNotifier {
     heroIds = ids;
     _prefs.setStringList('heroIds', ids);
     notifyListeners();
+  }
+
+  void setFavoriteTeam(String? t) {
+    favoriteTeam = t;
+    if (t == null || t.isEmpty) {
+      _prefs.remove('favTeam');
+    } else {
+      _prefs.setString('favTeam', t);
+    }
+    notifyListeners();
+    TeamAlerts.check(this);
+  }
+
+  void setNationalTeam(bool v) {
+    nationalTeam = v;
+    _prefs.setBool('nazionale', v);
+    notifyListeners();
+    TeamAlerts.check(this);
   }
 }
