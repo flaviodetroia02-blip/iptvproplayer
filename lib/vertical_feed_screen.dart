@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app_state.dart';
+import 'device.dart';
 import 'models.dart';
 import 'screens.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
 /// Feed verticale per Film e Serie presenti nella lista caricata.
-/// Parallasse fluida sull'immagine, indicatori in alto stile storie,
-/// watchlist rapida e doppio gradiente per leggibilità.
+/// Su Firestick (Device.isTv): cambio contenuto ISTANTANEO, niente parallasse.
+/// Su telefono/tablet: parallasse fluida come prima.
 class VerticalFeedScreen extends StatefulWidget {
   final AppState state;
   final Kind kind;
@@ -29,8 +30,8 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
   void initState() {
     super.initState();
     _page.addListener(() {
+      if (Device.isTv) return; // niente parallasse su TV
       final p = _page.page ?? 0;
-      // Aggiorna solo se il cambiamento è significativo (efficienza su Firestick)
       if ((p - _pageOffset).abs() > 0.008) {
         setState(() => _pageOffset = p);
       }
@@ -45,15 +46,18 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
     super.dispose();
   }
 
-  void _next() {
-    if (_index + 1 >= _items.length) return;
-    _page.nextPage(duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
+  void _goTo(int i) {
+    if (i < 0 || i >= _items.length) return;
+    if (Device.isTv) {
+      _page.jumpToPage(i);
+    } else {
+      _page.animateToPage(i,
+          duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
+    }
   }
 
-  void _prev() {
-    if (_index <= 0) return;
-    _page.previousPage(duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
-  }
+  void _next() => _goTo(_index + 1);
+  void _prev() => _goTo(_index - 1);
 
   void _openTrailer(Item it) {
     showDialog(
@@ -68,6 +72,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
               child: Image.network(
                 'https://img.youtube.com/vi/${it.trailerId}/maxresdefault.jpg',
                 fit: BoxFit.contain,
+                cacheWidth: 1280,
                 errorBuilder: (_, __, ___) => Art(url: it.image, title: it.name),
               ),
             ),
@@ -99,6 +104,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
         body: const Center(child: Text('Nessun contenuto in lista.')),
       );
     }
+    final isTv = Device.isTv;
     return Scaffold(
       backgroundColor: Colors.black,
       body: Focus(
@@ -121,30 +127,34 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
           PageView.builder(
             controller: _page,
             scrollDirection: Axis.vertical,
+            // Su TV: nessuno scroll (solo D-pad). Su touch: scroll normale.
+            physics: isTv ? const NeverScrollableScrollPhysics() : null,
             itemCount: _items.length,
             onPageChanged: (i) => setState(() => _index = i),
             itemBuilder: (_, i) {
               final it = _items[i];
-              final delta = (i - _pageOffset).clamp(-1.0, 1.0);
+              final delta = isTv ? 0.0 : (i - _pageOffset).clamp(-1.0, 1.0);
+
+              final image = it.trailerId != null
+                  ? Image.network(
+                      'https://img.youtube.com/vi/${it.trailerId}/maxresdefault.jpg',
+                      fit: BoxFit.cover,
+                      cacheWidth: 1280,
+                      errorBuilder: (_, __, ___) => Art(url: it.image, title: it.name),
+                    )
+                  : Art(url: it.image, title: it.name);
 
               return Stack(fit: StackFit.expand, children: [
-                // Parallasse: l'immagine si muove più lentamente dello scroll
-                Transform.translate(
-                  offset: Offset(0, delta * 90),
-                  child: Transform.scale(
-                    scale: 1 + (1 - delta.abs()) * 0.06,
-                    child: it.trailerId != null
-                        ? Image.network(
-                            'https://img.youtube.com/vi/${it.trailerId}/maxresdefault.jpg',
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                Art(url: it.image, title: it.name),
-                          )
-                        : Art(url: it.image, title: it.name),
+                if (isTv)
+                  image
+                else
+                  Transform.translate(
+                    offset: Offset(0, delta * 90),
+                    child: Transform.scale(
+                      scale: 1 + (1 - delta.abs()) * 0.06,
+                      child: image,
+                    ),
                   ),
-                ),
-
-                // Doppio gradiente (alto + basso) per leggibilità
                 const DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -160,8 +170,6 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
                     ),
                   ),
                 ),
-
-                // Barra indicatori in alto (stile storie)
                 Positioned(
                   top: MediaQuery.of(context).padding.top + 12,
                   left: 12,
@@ -186,8 +194,6 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
                     const SizedBox(width: 48),
                   ]),
                 ),
-
-                // Badge tipo
                 Positioned(
                   left: 20,
                   bottom: 240,
@@ -207,8 +213,6 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
                     ),
                   ),
                 ),
-
-                // Info + azioni in basso
                 Positioned(
                   left: 20,
                   right: 20,
