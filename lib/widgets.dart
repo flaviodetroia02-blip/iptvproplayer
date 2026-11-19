@@ -7,7 +7,6 @@ Color tone(String seed, {double lightness = 0.28}) {
   return HSLColor.fromAHSL(1, h.toDouble(), 0.35, lightness).toColor();
 }
 
-/// Fattore di ingrandimento per schermi grandi (PC e TV).
 double uiFactor = 1.0;
 void setUiFactor(double v) => uiFactor = v;
 
@@ -17,12 +16,10 @@ double uiScale(BuildContext c) {
   return base * uiFactor;
 }
 
-/// Margine laterale che cresce con la larghezza della finestra.
 double sidePad(BuildContext c) => (MediaQuery.of(c).size.width * 0.03).clamp(20.0, 64.0).toDouble();
 
-/// Immagine con sfondo sfumato di riserva (se manca o non carica).
-/// Usa cacheWidth/cacheHeight per limitare la RAM: su Firestick con 1-2GB
-/// le immagini a piena risoluzione causavano lag e crash.
+/// Immagine con sfondo sfumato di riserva.
+/// filterQuality medium migliora lo scaling delle immagini a bassa risoluzione.
 class Art extends StatelessWidget {
   final String? url;
   final String title;
@@ -59,8 +56,7 @@ class Art extends StatelessWidget {
           child: Image.network(
             url!,
             fit: contain ? BoxFit.contain : BoxFit.cover,
-            // Limita la decodifica in RAM: 400px di larghezza sono più che
-            // sufficienti per card fino a ~260px fisici anche in 4K.
+            filterQuality: FilterQuality.medium,
             cacheWidth: 400,
             cacheHeight: contain ? 400 : 600,
             errorBuilder: (_, __, ___) => label,
@@ -70,24 +66,50 @@ class Art extends StatelessWidget {
   }
 }
 
-class LiveBadge extends StatelessWidget {
+/// Badge "DIRETTA" con puntino pulsante (animazione reattiva al colore).
+class LiveBadge extends StatefulWidget {
   const LiveBadge({super.key});
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(4)),
-        child: const Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.circle, size: 6, color: Colors.white),
-          SizedBox(width: 5),
-          Text('DIRETTA',
-              style: TextStyle(
-                  fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: Colors.white)),
-        ]),
-      );
+  State<LiveBadge> createState() => _LiveBadgeState();
 }
 
-/// Contenitore con ingrandimento al passaggio del mouse e al focus (telecomando, tastiera).
+class _LiveBadgeState extends State<LiveBadge> with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(4)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        AnimatedBuilder(
+          animation: _c,
+          builder: (_, __) => Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha((160 + (95 * _c.value)).toInt()),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        const SizedBox(width: 5),
+        const Text('DIRETTA',
+            style: TextStyle(
+                fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: Colors.white)),
+      ]),
+    );
+  }
+}
+
 class FocusTile extends StatefulWidget {
   final Widget Function(bool active) builder;
   final VoidCallback onTap;
@@ -143,7 +165,7 @@ class _FocusTileState extends State<FocusTile> {
   }
 }
 
-/// Scheda canale (stile DAZN): immagine 16:9 con etichetta in diretta, titolo sotto.
+/// Scheda canale premium: ombra colorata, gradiente sul fondo, badge pulsante.
 class LiveCard extends StatelessWidget {
   final Item item;
   final bool fav;
@@ -159,10 +181,31 @@ class LiveCard extends StatelessWidget {
         FocusTile(
           onTap: onTap,
           onLongPress: onLong,
-          builder: (_) => AspectRatio(
+          builder: (active) => AspectRatio(
             aspectRatio: 16 / 9,
             child: Stack(fit: StackFit.expand, children: [
               Art(url: item.image, title: item.name, contain: true),
+              // Gradiente scuro sul fondo: dà profondità
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x00000000), Color(0x99000000)],
+                    stops: [0.55, 1],
+                  ),
+                ),
+              ),
+              // Alone colorato al focus
+              if (active)
+                IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.accent, width: 2.5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
               const Positioned(left: 10, top: 10, child: LiveBadge()),
               if (fav)
                 const Positioned(
@@ -191,11 +234,12 @@ class LiveCard extends StatelessWidget {
   }
 }
 
-/// Locandina (stile Netflix): al passaggio del mouse compaiono titolo e tasto play.
+/// Locandina con pattern "sfondo + immagine": se il poster è 16:9 o quadrato,
+/// i lati vengono riempiti con la stessa immagine scurita invece di bande nere.
 class PosterCard extends StatelessWidget {
   final Item item;
   final VoidCallback onTap;
-  final double? progress; // quanto hai già guardato, da 0 a 1
+  final double? progress;
   const PosterCard({super.key, required this.item, required this.onTap, this.progress});
 
   @override
@@ -211,7 +255,29 @@ class PosterCard extends StatelessWidget {
         builder: (active) => AspectRatio(
           aspectRatio: 2 / 3,
           child: Stack(fit: StackFit.expand, children: [
-            Art(url: item.image, title: item.name),
+            // 1) Sfondo: cover della stessa immagine, scurito
+            if (item.image != null)
+              Image.network(
+                item.image!,
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.low,
+                cacheWidth: 200,
+                color: Colors.black54,
+                colorBlendMode: BlendMode.darken,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            // 2) Foreground: contain per non tagliare il poster
+            if (item.image != null)
+              Image.network(
+                item.image!,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.medium,
+                cacheWidth: 400,
+                errorBuilder: (_, __, ___) => Art(url: item.image, title: item.name),
+              )
+            else
+              Art(url: item.image, title: item.name),
+            // 3) Overlay hover
             IgnorePointer(
               child: AnimatedOpacity(
                 opacity: active ? 1 : 0,
@@ -271,7 +337,6 @@ class PosterCard extends StatelessWidget {
   }
 }
 
-/// Riga scorrevole con frecce laterali (utili col mouse sul PC).
 class Rail extends StatefulWidget {
   final String title;
   final double height;
@@ -368,7 +433,6 @@ class _RailState extends State<Rail> {
   }
 }
 
-/// Schede dei giorni per il calendario (Oggi, Domani, ...).
 class DayTabs extends StatelessWidget {
   final List<String> labels;
   final int selected;
@@ -403,7 +467,6 @@ class DayTabs extends StatelessWidget {
   }
 }
 
-/// Filtri per categoria, come le schede in alto di DAZN.
 class GenreChips extends StatelessWidget {
   final List<String> groups;
   final String? selected;
@@ -463,6 +526,7 @@ class _TeamBadge extends StatelessWidget {
           ? initial
           : Image.network(url!,
               fit: BoxFit.contain,
+              filterQuality: FilterQuality.medium,
               cacheWidth: 64,
               cacheHeight: 64,
               errorBuilder: (_, __, ___) => initial),
@@ -470,7 +534,6 @@ class _TeamBadge extends StatelessWidget {
   }
 }
 
-/// Scheda partita con stemmi, orario e tasto "Guarda ora".
 class MatchCard extends StatelessWidget {
   final Fixture match;
   final VoidCallback onWatch;
@@ -530,7 +593,6 @@ class MatchCard extends StatelessWidget {
   }
 }
 
-/// Riquadro di riserva quando non ci sono anteprime disponibili.
 class FeaturedBanner extends StatelessWidget {
   final Item item;
   final bool fav, cover;
@@ -565,6 +627,7 @@ class FeaturedBanner extends StatelessWidget {
           Image.network(item.image!,
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
+              filterQuality: FilterQuality.medium,
               cacheWidth: 1280,
               errorBuilder: (_, __, ___) => bg)
         else
@@ -631,6 +694,7 @@ class _BigBadge extends StatelessWidget {
           ? initial
           : Image.network(url!,
               fit: BoxFit.contain,
+              filterQuality: FilterQuality.medium,
               cacheWidth: 200,
               cacheHeight: 200,
               errorBuilder: (_, __, ___) => initial),
@@ -638,7 +702,6 @@ class _BigBadge extends StatelessWidget {
   }
 }
 
-/// Locandina dell'evento mostrata 5 secondi prima che parta l'anteprima.
 class EventPoster extends StatelessWidget {
   final Fixture match;
   const EventPoster({super.key, required this.match});
@@ -718,7 +781,6 @@ class EventPoster extends StatelessWidget {
   }
 }
 
-/// Locandina di film e serie: occupa tutta l'area dell'anteprima.
 class VodPoster extends StatelessWidget {
   final Item item;
   const VodPoster({super.key, required this.item});
@@ -741,6 +803,7 @@ class VodPoster extends StatelessWidget {
       Image.network(img,
           fit: BoxFit.cover,
           alignment: const Alignment(0, -0.25),
+          filterQuality: FilterQuality.medium,
           cacheWidth: 1280,
           errorBuilder: (_, __, ___) => fallback),
       const ColoredBox(color: Color(0x44000000)),
