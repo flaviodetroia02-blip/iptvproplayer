@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'app_state.dart';
 import 'device.dart';
 import 'models.dart';
@@ -7,9 +8,6 @@ import 'screens.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-/// Feed verticale per Film e Serie presenti nella lista caricata.
-/// Su Firestick (Device.isTv): cambio contenuto ISTANTANEO, niente parallasse.
-/// Su telefono/tablet: parallasse fluida come prima.
 class VerticalFeedScreen extends StatefulWidget {
   final AppState state;
   final Kind kind;
@@ -30,7 +28,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
   void initState() {
     super.initState();
     _page.addListener(() {
-      if (Device.isTv) return; // niente parallasse su TV
+      if (Device.isTv) return;
       final p = _page.page ?? 0;
       if ((p - _pageOffset).abs() > 0.008) {
         setState(() => _pageOffset = p);
@@ -60,39 +58,53 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
   void _prev() => _goTo(_index - 1);
 
   void _openTrailer(Item it) {
+    final controller = YoutubePlayerController.fromVideoId(
+      videoId: it.trailerId!,
+      autoPlay: true,
+      params: const YoutubePlayerParams(
+        mute: false,
+        showControls: true,
+        showFullscreenButton: true,
+        loop: false,
+      ),
+    );
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => Dialog(
         backgroundColor: Colors.black,
         insetPadding: const EdgeInsets.all(12),
-        child: AspectRatio(
-          aspectRatio: 16 / 9,
-          child: Stack(children: [
-            Center(
-              child: Image.network(
-                'https://img.youtube.com/vi/${it.trailerId}/maxresdefault.jpg',
-                fit: BoxFit.contain,
-                cacheWidth: 1280,
-                errorBuilder: (_, __, ___) => Art(url: it.image, title: it.name),
-              ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    it.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  onPressed: () {
+                    controller.close();
+                    Navigator.pop(ctx);
+                  },
+                ),
+              ],
             ),
-            Positioned(
-              top: 0,
-              right: 0,
-              child: IconButton(
-                icon: const Icon(Icons.close_rounded, color: Colors.white),
-                style: IconButton.styleFrom(backgroundColor: const Color(0x88000000)),
-                onPressed: () => Navigator.pop(ctx),
-              ),
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: YoutubePlayer(controller: controller),
             ),
-            Center(
-              child: Icon(Icons.play_circle_filled_rounded,
-                  size: 72, color: Colors.white.withAlpha(210)),
-            ),
-          ]),
+          ],
         ),
       ),
-    );
+    ).then((_) => controller.close());
   }
 
   @override
@@ -127,18 +139,17 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
           PageView.builder(
             controller: _page,
             scrollDirection: Axis.vertical,
-            // Su TV: nessuno scroll (solo D-pad). Su touch: scroll normale.
             physics: isTv ? const NeverScrollableScrollPhysics() : null,
             itemCount: _items.length,
             onPageChanged: (i) => setState(() => _index = i),
             itemBuilder: (_, i) {
               final it = _items[i];
               final delta = isTv ? 0.0 : (i - _pageOffset).clamp(-1.0, 1.0);
-
               final image = it.trailerId != null
                   ? Image.network(
                       'https://img.youtube.com/vi/${it.trailerId}/maxresdefault.jpg',
                       fit: BoxFit.cover,
+                      filterQuality: FilterQuality.medium,
                       cacheWidth: 1280,
                       errorBuilder: (_, __, ___) => Art(url: it.image, title: it.name),
                     )
@@ -261,7 +272,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
                             width: 52,
                             height: 52,
                             child: IconButton(
-                              tooltip: 'Apri trailer',
+                              tooltip: 'Guarda il trailer',
                               onPressed: () => _openTrailer(it),
                               icon: const Icon(Icons.play_circle_outline_rounded),
                               style: IconButton.styleFrom(
