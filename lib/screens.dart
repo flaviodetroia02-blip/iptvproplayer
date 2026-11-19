@@ -15,7 +15,6 @@ void openItem(BuildContext context, AppState state, Item i) {
   Navigator.push(context, MaterialPageRoute(builder: (_) => page)).then((_) => state.routePop());
 }
 
-/// Elenco dei canali sportivi della playlist per guardare una partita.
 void showChannelPicker(BuildContext context, AppState state, Fixture m) {
   final list = sportsChannels(state.live, m.tag);
   showModalBottomSheet(
@@ -73,7 +72,6 @@ void showChannelPicker(BuildContext context, AppState state, Fixture m) {
   );
 }
 
-/// Scheda "Altre info" di un film (le serie aprono l'elenco degli episodi).
 void showInfo(BuildContext context, AppState state, Item i) {
   if (i.kind == Kind.series) {
     openItem(context, state, i);
@@ -146,8 +144,10 @@ class _SearchScreenState extends State<SearchScreen> {
             .toList();
     return SafeArea(
       child: Column(children: [
+        // Spazio per i pulsanti in alto a destra (riprendi, notifiche, impostazioni)
+        const SizedBox(height: 64),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
           child: TextField(
             onChanged: (v) => setState(() => q = v.trim().toLowerCase()),
             decoration: const InputDecoration(
@@ -214,8 +214,6 @@ class SeriesDetail extends StatelessWidget {
           if (snap.hasError || eps.isEmpty) {
             return const Center(child: Text('Episodi non disponibili.'));
           }
-
-          // Trova l'episodio in corso: primo con progresso > 10s e non completato
           Episode? riprendi;
           for (final e in eps) {
             final pos = state.positionOf(e.url);
@@ -226,12 +224,10 @@ class SeriesDetail extends StatelessWidget {
             }
           }
           final heroEp = riprendi ?? eps.first;
-
           final seasons = <int, List<Episode>>{};
           for (final e in eps) {
             (seasons[e.season] ??= []).add(e);
           }
-
           return ListView(padding: EdgeInsets.zero, children: [
             SizedBox(
               height: 380,
