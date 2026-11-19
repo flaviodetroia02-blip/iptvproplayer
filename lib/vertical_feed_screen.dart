@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'app_state.dart';
 import 'device.dart';
 import 'models.dart';
@@ -8,6 +8,9 @@ import 'screens.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
+/// Feed verticale per Film e Serie presenti nella lista caricata.
+/// Su Firestick: cambio contenuto ISTANTANEO, niente parallasse.
+/// Il trailer si apre nell'app YouTube o nel browser (url_launcher), zero WebView interna.
 class VerticalFeedScreen extends StatefulWidget {
   final AppState state;
   final Kind kind;
@@ -21,19 +24,11 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
   late final List<Item> _items = widget.state.itemsOf(widget.kind);
   final _focus = FocusNode();
   final _page = PageController();
-  double _pageOffset = 0;
   int _index = 0;
 
   @override
   void initState() {
     super.initState();
-    _page.addListener(() {
-      if (Device.isTv) return;
-      final p = _page.page ?? 0;
-      if ((p - _pageOffset).abs() > 0.008) {
-        setState(() => _pageOffset = p);
-      }
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
   }
 
@@ -57,54 +52,22 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
   void _next() => _goTo(_index + 1);
   void _prev() => _goTo(_index - 1);
 
-  void _openTrailer(Item it) {
-    final controller = YoutubePlayerController.fromVideoId(
-      videoId: it.trailerId!,
-      autoPlay: true,
-      params: const YoutubePlayerParams(
-        mute: false,
-        showControls: true,
-        showFullscreenButton: true,
-        loop: false,
-      ),
-    );
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.black,
-        insetPadding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    it.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded, color: Colors.white),
-                  onPressed: () {
-                    controller.close();
-                    Navigator.pop(ctx);
-                  },
-                ),
-              ],
-            ),
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: YoutubePlayer(controller: controller),
-            ),
-          ],
-        ),
-      ),
-    ).then((_) => controller.close());
+  Future<void> _openTrailer(Item it) async {
+    final url = Uri.parse('https://www.youtube.com/watch?v=${it.trailerId}');
+    try {
+      final ok = await launchUrl(url, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossibile aprire YouTube')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossibile aprire YouTube')),
+        );
+      }
+    }
   }
 
   @override
@@ -144,7 +107,8 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
             onPageChanged: (i) => setState(() => _index = i),
             itemBuilder: (_, i) {
               final it = _items[i];
-              final delta = isTv ? 0.0 : (i - _pageOffset).clamp(-1.0, 1.0);
+
+              // Immagine: niente parallasse, direttamente cover.
               final image = it.trailerId != null
                   ? Image.network(
                       'https://img.youtube.com/vi/${it.trailerId}/maxresdefault.jpg',
@@ -156,16 +120,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
                   : Art(url: it.image, title: it.name);
 
               return Stack(fit: StackFit.expand, children: [
-                if (isTv)
-                  image
-                else
-                  Transform.translate(
-                    offset: Offset(0, delta * 90),
-                    child: Transform.scale(
-                      scale: 1 + (1 - delta.abs()) * 0.06,
-                      child: image,
-                    ),
-                  ),
+                image,
                 const DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -272,7 +227,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
                             width: 52,
                             height: 52,
                             child: IconButton(
-                              tooltip: 'Guarda il trailer',
+                              tooltip: 'Guarda il trailer su YouTube',
                               onPressed: () => _openTrailer(it),
                               icon: const Icon(Icons.play_circle_outline_rounded),
                               style: IconButton.styleFrom(
