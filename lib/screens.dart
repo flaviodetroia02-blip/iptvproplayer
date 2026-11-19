@@ -15,7 +15,6 @@ void openItem(BuildContext context, AppState state, Item i) {
   Navigator.push(context, MaterialPageRoute(builder: (_) => page)).then((_) => state.routePop());
 }
 
-
 /// Elenco dei canali sportivi della playlist per guardare una partita.
 void showChannelPicker(BuildContext context, AppState state, Fixture m) {
   final list = sportsChannels(state.live, m.tag);
@@ -215,10 +214,24 @@ class SeriesDetail extends StatelessWidget {
           if (snap.hasError || eps.isEmpty) {
             return const Center(child: Text('Episodi non disponibili.'));
           }
+
+          // Trova l'episodio in corso: primo con progresso > 10s e non completato
+          Episode? riprendi;
+          for (final e in eps) {
+            final pos = state.positionOf(e.url);
+            final dur = state.durations[e.url] ?? 0;
+            if (pos > 10 && (dur == 0 || pos < dur - 60)) {
+              riprendi = e;
+              break;
+            }
+          }
+          final heroEp = riprendi ?? eps.first;
+
           final seasons = <int, List<Episode>>{};
           for (final e in eps) {
             (seasons[e.season] ??= []).add(e);
           }
+
           return ListView(padding: EdgeInsets.zero, children: [
             SizedBox(
               height: 380,
@@ -245,11 +258,32 @@ class SeriesDetail extends StatelessWidget {
                         style: Theme.of(context).textTheme.headlineMedium),
                     const SizedBox(height: 6),
                     Text(item.group, style: Theme.of(context).textTheme.bodySmall),
+                    if (riprendi != null) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'IN CORSO · S${riprendi.season} E${riprendi.number}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     FilledButton.icon(
-                      onPressed: () => openItem(context, state, _ep(eps.first)),
+                      onPressed: () => openItem(context, state, _ep(heroEp)),
                       icon: const Icon(Icons.play_arrow_rounded),
-                      label: const Text('Riproduci'),
+                      label: Text(riprendi != null
+                          ? 'Riprendi S${heroEp.season} E${heroEp.number}'
+                          : 'Riproduci'),
                       style: FilledButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: Colors.black,
@@ -266,13 +300,15 @@ class SeriesDetail extends StatelessWidget {
                 child: Text('Stagione ${s.key}', style: Theme.of(context).textTheme.titleMedium),
               ),
               for (final e in s.value)
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-                  leading: Text('${e.number}',
-                      style: const TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
-                  title: Text(e.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  trailing: const Icon(Icons.play_circle_outline_rounded),
+                _EpisodeTile(
+                  episode: e,
+                  inCorso: riprendi?.url == e.url,
+                  progress: (() {
+                    final pos = state.positionOf(e.url);
+                    final dur = state.durations[e.url] ?? 0;
+                    if (pos <= 0 || dur <= 0) return null;
+                    return (pos / dur).clamp(0.0, 1.0).toDouble();
+                  })(),
                   onTap: () => openItem(context, state, _ep(e)),
                 ),
             ],
@@ -280,6 +316,60 @@ class SeriesDetail extends StatelessWidget {
           ]);
         },
       ),
+    );
+  }
+}
+
+class _EpisodeTile extends StatelessWidget {
+  final Episode episode;
+  final bool inCorso;
+  final double? progress;
+  final VoidCallback onTap;
+  const _EpisodeTile({
+    required this.episode,
+    required this.inCorso,
+    required this.progress,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+      leading: SizedBox(
+        width: 32,
+        child: Center(
+          child: inCorso
+              ? const Icon(Icons.play_circle_fill_rounded, color: AppColors.accent, size: 24)
+              : Text(
+                  '${episode.number}',
+                  style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary),
+                ),
+        ),
+      ),
+      title: Text(episode.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: (progress != null && progress! > 0)
+          ? Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 3,
+                  backgroundColor: AppColors.surfaceHigh,
+                  color: AppColors.accent,
+                ),
+              ),
+            )
+          : null,
+      trailing: Icon(
+        inCorso ? Icons.play_arrow_rounded : Icons.play_circle_outline_rounded,
+        color: inCorso ? AppColors.accent : null,
+      ),
+      onTap: onTap,
     );
   }
 }
