@@ -21,6 +21,8 @@ double uiScale(BuildContext c) {
 double sidePad(BuildContext c) => (MediaQuery.of(c).size.width * 0.03).clamp(20.0, 64.0).toDouble();
 
 /// Immagine con sfondo sfumato di riserva (se manca o non carica).
+/// Usa cacheWidth/cacheHeight per limitare la RAM: su Firestick con 1-2GB
+/// le immagini a piena risoluzione causavano lag e crash.
 class Art extends StatelessWidget {
   final String? url;
   final String title;
@@ -54,9 +56,15 @@ class Art extends StatelessWidget {
       else
         Padding(
           padding: EdgeInsets.all(contain ? 22 : 0),
-          child: Image.network(url!,
-              fit: contain ? BoxFit.contain : BoxFit.cover,
-              errorBuilder: (_, __, ___) => label),
+          child: Image.network(
+            url!,
+            fit: contain ? BoxFit.contain : BoxFit.cover,
+            // Limita la decodifica in RAM: 400px di larghezza sono più che
+            // sufficienti per card fino a ~260px fisici anche in 4K.
+            cacheWidth: 400,
+            cacheHeight: contain ? 400 : 600,
+            errorBuilder: (_, __, ___) => label,
+          ),
         ),
     ]);
   }
@@ -453,7 +461,11 @@ class _TeamBadge extends StatelessWidget {
       decoration: const BoxDecoration(color: AppColors.surfaceHigh, shape: BoxShape.circle),
       child: url == null
           ? initial
-          : Image.network(url!, fit: BoxFit.contain, errorBuilder: (_, __, ___) => initial),
+          : Image.network(url!,
+              fit: BoxFit.contain,
+              cacheWidth: 64,
+              cacheHeight: 64,
+              errorBuilder: (_, __, ___) => initial),
     );
   }
 }
@@ -551,7 +563,10 @@ class FeaturedBanner extends StatelessWidget {
       child: Stack(fit: StackFit.expand, children: [
         if (cover && item.image != null)
           Image.network(item.image!,
-              fit: BoxFit.cover, alignment: Alignment.topCenter, errorBuilder: (_, __, ___) => bg)
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+              cacheWidth: 1280,
+              errorBuilder: (_, __, ___) => bg)
         else
           bg,
         const DecoratedBox(
@@ -614,7 +629,11 @@ class _BigBadge extends StatelessWidget {
       ),
       child: url == null
           ? initial
-          : Image.network(url!, fit: BoxFit.contain, errorBuilder: (_, __, ___) => initial),
+          : Image.network(url!,
+              fit: BoxFit.contain,
+              cacheWidth: 200,
+              cacheHeight: 200,
+              errorBuilder: (_, __, ___) => initial),
     );
   }
 }
@@ -722,6 +741,7 @@ class VodPoster extends StatelessWidget {
       Image.network(img,
           fit: BoxFit.cover,
           alignment: const Alignment(0, -0.25),
+          cacheWidth: 1280,
           errorBuilder: (_, __, ___) => fallback),
       const ColoredBox(color: Color(0x44000000)),
     ]);
