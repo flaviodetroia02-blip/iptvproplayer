@@ -38,6 +38,7 @@ jobs:
           t = re.sub(r'android:label="[^"]*"', 'android:label="PRIMA"', t, count=1)
           perms = ('<uses-permission android:name="android.permission.INTERNET"/>\n'
                    '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>\n'
+                   '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n'
                    '    <uses-feature android:name="android.software.leanback" android:required="false"/>\n'
                    '    <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>\n    ')
           t = t.replace('<application', perms + '<application android:usesCleartextTraffic="true" android:banner="@drawable/tv_banner"', 1)
@@ -50,6 +51,75 @@ jobs:
               sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/; s/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' "$f"
             fi
           done
+      - name: Abilita core library desugaring (necessario per flutter_local_notifications)
+        run: |
+          python3 - <<'PY'
+          import os
+
+          for gradle in ['android/app/build.gradle.kts', 'android/app/build.gradle']:
+              if not os.path.exists(gradle):
+                  continue
+              t = open(gradle, encoding='utf-8').read()
+              is_kts = gradle.endswith('.kts')
+
+              if is_kts:
+                  if 'isCoreLibraryDesugaringEnabled' not in t:
+                      if 'compileOptions {' in t:
+                          t = t.replace(
+                              'compileOptions {',
+                              'compileOptions {\n        isCoreLibraryDesugaringEnabled = true',
+                              1)
+                      elif 'compileOptions{' in t:
+                          t = t.replace(
+                              'compileOptions{',
+                              'compileOptions {\n        isCoreLibraryDesugaringEnabled = true',
+                              1)
+                      elif 'android {' in t:
+                          t = t.replace(
+                              'android {',
+                              'android {\n    compileOptions {\n        isCoreLibraryDesugaringEnabled = true\n    }',
+                              1)
+                  if 'coreLibraryDesugaring' not in t:
+                      if 'dependencies {' in t:
+                          t = t.replace(
+                              'dependencies {',
+                              'dependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")',
+                              1)
+                      else:
+                          t += '\n\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n}\n'
+              else:
+                  if 'coreLibraryDesugaringEnabled' not in t:
+                      if 'compileOptions {' in t:
+                          t = t.replace(
+                              'compileOptions {',
+                              'compileOptions {\n        coreLibraryDesugaringEnabled true',
+                              1)
+                      elif 'compileOptions{' in t:
+                          t = t.replace(
+                              'compileOptions{',
+                              'compileOptions {\n        coreLibraryDesugaringEnabled true',
+                              1)
+                      elif 'android {' in t:
+                          t = t.replace(
+                              'android {',
+                              'android {\n    compileOptions {\n        coreLibraryDesugaringEnabled true\n    }',
+                              1)
+                  if 'coreLibraryDesugaring' not in t:
+                      if 'dependencies {' in t:
+                          t = t.replace(
+                              'dependencies {',
+                              "dependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'",
+                              1)
+                      else:
+                          t += "\n\ndependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\n}\n"
+
+              open(gradle, 'w', encoding='utf-8').write(t)
+              print(f'Patched: {gradle}')
+          PY
+      - name: Verifica patch desugaring
+        run: |
+          echo "=== build.gradle.kts ==="
+          cat android/app/build.gradle.kts 2>/dev/null || cat android/app/build.gradle
       - run: flutter pub get
       - name: Compila APK (con nuovi tentativi)
         run: |
