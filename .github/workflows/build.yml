@@ -116,7 +116,88 @@ jobs:
               open(gradle, 'w', encoding='utf-8').write(t)
               print(f'Patched: {gradle}')
           PY
-      - name: Verifica patch desugaring
+      - name: Disabilita il lint di release (bug noto con webview_flutter_android)
+        run: |
+          python3 - <<'PY'
+          import os
+
+          for gradle in ['android/app/build.gradle.kts', 'android/app/build.gradle']:
+              if not os.path.exists(gradle):
+                  continue
+              t = open(gradle, encoding='utf-8').read()
+              is_kts = gradle.endswith('.kts')
+
+              # Per build.gradle.kts (Kotlin DSL)
+              if is_kts:
+                  if 'lint {' not in t and 'lintOptions {' not in t:
+                      # Aggiunge un blocco lint vuoto se non esiste
+                      if 'android {' in t:
+                          t = t.replace(
+                              'android {',
+                              'android {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }',
+                              1)
+                      elif 'android{' in t:
+                          t = t.replace(
+                              'android{',
+                              'android {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }',
+                              1)
+                  else:
+                      # Se esiste già un blocco lint/lintOptions, aggiunge le proprietà
+                      if 'checkReleaseBuilds' not in t:
+                          t = t.replace(
+                              'lint {',
+                              'lint {\n        checkReleaseBuilds = false',
+                              1)
+                          t = t.replace(
+                              'lintOptions {',
+                              'lintOptions {\n        checkReleaseBuilds = false',
+                              1)
+                      if 'abortOnError' not in t:
+                          t = t.replace(
+                              'lint {',
+                              'lint {\n        abortOnError = false',
+                              1)
+                          t = t.replace(
+                              'lintOptions {',
+                              'lintOptions {\n        abortOnError = false',
+                              1)
+              # Per build.gradle (Groovy)
+              else:
+                  if 'lint {' not in t and 'lintOptions {' not in t:
+                      if 'android {' in t:
+                          t = t.replace(
+                              'android {',
+                              'android {\n    lint {\n        checkReleaseBuilds false\n        abortOnError false\n    }',
+                              1)
+                      elif 'android{' in t:
+                          t = t.replace(
+                              'android{',
+                              'android {\n    lint {\n        checkReleaseBuilds false\n        abortOnError false\n    }',
+                              1)
+                  else:
+                      if 'checkReleaseBuilds' not in t:
+                          t = t.replace(
+                              'lint {',
+                              'lint {\n        checkReleaseBuilds false',
+                              1)
+                          t = t.replace(
+                              'lintOptions {',
+                              'lintOptions {\n        checkReleaseBuilds false',
+                              1)
+                      if 'abortOnError' not in t:
+                          t = t.replace(
+                              'lint {',
+                              'lint {\n        abortOnError false',
+                              1)
+                          t = t.replace(
+                              'lintOptions {',
+                              'lintOptions {\n        abortOnError false',
+                              1)
+
+              open(gradle, 'w', encoding='utf-8').write(t)
+              print(f'Patched lint: {gradle}')
+          PY
+      - name: Verifica patch desugaring e lint
         run: |
           echo "=== build.gradle.kts ==="
           cat android/app/build.gradle.kts 2>/dev/null || cat android/app/build.gradle
