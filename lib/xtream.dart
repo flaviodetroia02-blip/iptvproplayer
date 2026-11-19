@@ -51,6 +51,15 @@ class XtreamClient {
     return s.startsWith('http') ? s : null;
   }
 
+  /// Sceglie la migliore immagine disponibile tra più campi (big prima).
+  String? _imgBest(List<dynamic> candidates) {
+    for (final c in candidates) {
+      final v = _img(c);
+      if (v != null) return v;
+    }
+    return null;
+  }
+
   String? _ytId(dynamic v) {
     final s = v?.toString().trim() ?? '';
     if (s.isEmpty) return null;
@@ -69,7 +78,7 @@ class XtreamClient {
           url: '$server/live/$user/$pass/${s['stream_id']}.m3u8',
           group: cats['${s['category_id']}'] ?? 'Altro',
           kind: Kind.live,
-          image: _img(s['stream_icon']),
+          image: _imgBest([s['stream_icon'], s['stream_icon_big']]),
         ),
     ];
   }
@@ -84,7 +93,8 @@ class XtreamClient {
           url: '$server/movie/$user/$pass/${s['stream_id']}.${s['container_extension'] ?? 'mp4'}',
           group: cats['${s['category_id']}'] ?? 'Altro',
           kind: Kind.movie,
-          image: _img(s['stream_icon']),
+          // stream_icon_big prima, poi stream_icon, poi movie_image
+          image: _imgBest([s['stream_icon_big'], s['stream_icon'], s['movie_image']]),
           added: int.tryParse('${s['added'] ?? ''}'),
           trailerId: _ytId(s['youtube_trailer']),
         ),
@@ -102,7 +112,8 @@ class XtreamClient {
           seriesId: '${s['series_id']}',
           group: cats['${s['category_id']}'] ?? 'Altro',
           kind: Kind.series,
-          image: _img(s['cover']),
+          // cover_big prima, poi cover, poi backdrop
+          image: _imgBest([s['cover_big'], s['cover'], s['backdrop_path']]),
           added: int.tryParse('${s['last_modified'] ?? ''}'),
           trailerId: _ytId(s['youtube_trailer']),
         ),
