@@ -4,13 +4,15 @@ import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'app_state.dart';
+import 'device.dart';
 import 'epg.dart';
 import 'models.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-/// Zapping verticale premium: una sola connessione video attiva alla volta,
+/// Zapping verticale: una sola connessione video attiva alla volta,
 /// nessun pre-caricamento dei canali vicini, debounce sullo scroll.
+/// Su Firestick (Device.isTv): cambio canale ISTANTANEO, niente animazione.
 class ZappingScreen extends StatefulWidget {
   final AppState state;
   final int initialIndex;
@@ -77,15 +79,19 @@ class _ZappingScreenState extends State<ZappingScreen> {
     }
   }
 
-  void _next() {
-    if (_index + 1 >= _channels.length) return;
-    _page.nextPage(duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+  /// Cambio pagina: istantaneo su TV, animato su touch.
+  void _goTo(int i) {
+    if (i < 0 || i >= _channels.length) return;
+    if (Device.isTv) {
+      _page.jumpToPage(i);
+    } else {
+      _page.animateToPage(i,
+          duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+    }
   }
 
-  void _prev() {
-    if (_index <= 0) return;
-    _page.previousPage(duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
-  }
+  void _next() => _goTo(_index + 1);
+  void _prev() => _goTo(_index - 1);
 
   KeyEventResult _onKey(FocusNode node, KeyEvent e) {
     if (e is! KeyDownEvent && e is! KeyRepeatEvent) return KeyEventResult.ignored;
@@ -117,6 +123,8 @@ class _ZappingScreenState extends State<ZappingScreen> {
           PageView.builder(
             controller: _page,
             scrollDirection: Axis.vertical,
+            // Su TV: nessuno scroll (solo D-pad). Su touch: scroll normale.
+            physics: Device.isTv ? const NeverScrollableScrollPhysics() : null,
             itemCount: chs.length,
             onPageChanged: (i) {
               setState(() => _index = i);
@@ -126,7 +134,6 @@ class _ZappingScreenState extends State<ZappingScreen> {
               final c = chs[i];
               final isCurrent = i == _index;
               return Stack(fit: StackFit.expand, children: [
-                // Sfondo: logo sfocato + gradiente (riempie le bande nere)
                 if (c.image != null)
                   Positioned.fill(
                     child: Image.network(
@@ -134,10 +141,10 @@ class _ZappingScreenState extends State<ZappingScreen> {
                       fit: BoxFit.cover,
                       color: Colors.black54,
                       colorBlendMode: BlendMode.darken,
+                      cacheWidth: 1280,
                       errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                     ),
                   ),
-                // Video del canale corrente (con fade-in)
                 if (isCurrent && _playingUrl == c.url)
                   AnimatedOpacity(
                     opacity: 1,
@@ -154,7 +161,6 @@ class _ZappingScreenState extends State<ZappingScreen> {
                           strokeWidth: 3, color: AppColors.accent),
                     ),
                   ),
-                // Logo grande del canale non corrente (placeholder)
                 if (!isCurrent)
                   Center(
                     child: SizedBox(
@@ -163,7 +169,6 @@ class _ZappingScreenState extends State<ZappingScreen> {
                       child: Art(url: c.image, title: c.name, contain: true),
                     ),
                   ),
-                // Numero canale in filigrana
                 Positioned(
                   right: 20,
                   top: 60,
@@ -177,7 +182,6 @@ class _ZappingScreenState extends State<ZappingScreen> {
                     ),
                   ),
                 ),
-                // Info in basso
                 Positioned(
                   left: 20,
                   right: 60,
@@ -204,7 +208,6 @@ class _ZappingScreenState extends State<ZappingScreen> {
               ]);
             },
           ),
-          // Mini lista canali laterale
           Positioned(
             right: 12,
             top: 0,
@@ -214,15 +217,11 @@ class _ZappingScreenState extends State<ZappingScreen> {
                 child: _ChannelMiniList(
                   channels: chs,
                   index: _index,
-                  onSelect: (i) {
-                    _page.animateToPage(i,
-                        duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
-                  },
+                  onSelect: _goTo,
                 ),
               ),
             ),
           ),
-          // Barra superiore
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
