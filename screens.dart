@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'app_state.dart';
+import 'brand.dart';
 import 'models.dart';
 import 'player_screen.dart';
 import 'sports.dart';
@@ -10,13 +11,12 @@ void openItem(BuildContext context, AppState state, Item i) {
   final Widget page = (i.kind == Kind.series && i.url.isEmpty)
       ? SeriesDetail(state: state, item: i)
       : PlayerScreen(title: i.name, url: i.url, state: state, item: i);
-  Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+  state.routePush();
+  Navigator.push(context, MaterialPageRoute(builder: (_) => page)).then((_) => state.routePop());
 }
 
-
-/// Elenco dei canali sportivi della playlist per guardare una partita.
-void showChannelPicker(BuildContext context, AppState state, Match m) {
-  final list = sportsChannels(state.live, cup: m.cup);
+void showChannelPicker(BuildContext context, AppState state, Fixture m) {
+  final list = sportsChannels(state.live, m.tag);
   showModalBottomSheet(
     context: context,
     backgroundColor: AppColors.surface,
@@ -53,8 +53,14 @@ void showChannelPicker(BuildContext context, AppState state, Match m) {
                       ),
                     ),
                     title: Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    trailing: resolutionLabel(c.name).isEmpty
+                        ? null
+                        : Text(resolutionLabel(c.name),
+                            style: const TextStyle(
+                                color: AppColors.accent, fontWeight: FontWeight.w800, fontSize: 12.5)),
                     onTap: () {
                       Navigator.pop(ctx);
+                      state.setPreferred(m, c);
                       openItem(context, state, c);
                     },
                   ),
@@ -66,110 +72,52 @@ void showChannelPicker(BuildContext context, AppState state, Match m) {
   );
 }
 
-/// Pagina di una sezione: TV diretta (schede 16:9) oppure film/serie (locandine).
-class BrowseScreen extends StatelessWidget {
-  final AppState state;
-  final Kind kind;
-  const BrowseScreen({super.key, required this.state, required this.kind});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(listenable: state, builder: (c, _) => _body(c));
+void showInfo(BuildContext context, AppState state, Item i) {
+  if (i.kind == Kind.series) {
+    openItem(context, state, i);
+    return;
   }
-
-  Widget _body(BuildContext context) {
-    final items = state.itemsOf(kind);
-    if (items.isEmpty) {
-      return Center(
-        child: state.loading
-            ? const CircularProgressIndicator(color: AppColors.accent)
-            : Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Text(state.error ?? 'Nessun contenuto in questa sezione.',
-                      textAlign: TextAlign.center),
-                  if (state.error != null) ...[
-                    const SizedBox(height: 16),
-                    FilledButton(onPressed: () => state.reload(), child: const Text('Riprova')),
-                  ],
-                ]),
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: AppColors.surface,
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(
+            width: 110,
+            height: 165,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Art(url: i.image, title: i.name),
+            ),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(i.name, style: Theme.of(ctx).textTheme.titleMedium),
+              const SizedBox(height: 6),
+              Text(i.group, style: Theme.of(ctx).textTheme.bodySmall),
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  openItem(context, state, i);
+                },
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: const Text('Riproduci'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                ),
               ),
-      );
-    }
-    final live = kind == Kind.live;
-    final favs = live ? state.favoriteLive : <Item>[];
-    final recents = state.recents.where((i) => i.kind == kind).toList();
-    final h = live ? 224.0 : 284.0;
-    Widget card(Item i) => live
-        ? LiveCard(
-            item: i,
-            fav: state.isFav(i),
-            onTap: () => openItem(context, state, i),
-            onLong: () => state.toggleFav(i))
-        : PosterCard(item: i, onTap: () => openItem(context, state, i));
-
-    final featured = favs.isNotEmpty
-        ? favs.first
-        : items.firstWhere((i) => i.image != null, orElse: () => items.first);
-    Widget hero = FeaturedBanner(
-      item: featured,
-      cover: !live,
-      fav: state.isFav(featured),
-      playLabel: kind == Kind.series ? 'Guarda' : 'Guarda ora',
-      onPlay: () => openItem(context, state, featured),
-      onFav: () => state.toggleFav(featured),
-    );
-    final top = <Widget>[];
-    if (live) {
-      final pop = popularChannels(state.live);
-      if (state.matches.isNotEmpty) {
-        final m = state.matches.first;
-        hero = EventBanner(
-          badge: m.league,
-          title: '${m.home} – ${m.away}',
-          subtitle: m.when,
-          button: 'Guarda ora',
-          live: m.live,
-          onPressed: () => showChannelPicker(context, state, m),
-        );
-        top.add(Rail(
-          title: 'Partite in programma',
-          height: 216,
-          children: [
-            for (final m in state.matches)
-              MatchCard(match: m, onWatch: () => showChannelPicker(context, state, m)),
-          ],
-        ));
-      } else if (pop.isNotEmpty) {
-        hero = EventBanner(
-          badge: 'Tra i più seguiti in Italia',
-          title: pop.first.name,
-          subtitle: pop.first.group,
-          button: 'Guarda ora',
-          live: false,
-          onPressed: () => openItem(context, state, pop.first),
-        );
-      }
-      if (recents.isNotEmpty) {
-        top.add(Rail(title: 'Visti di recente', height: h, children: [for (final i in recents) card(i)]));
-      }
-      if (favs.isNotEmpty) {
-        top.add(Rail(title: 'Preferiti', height: h, children: [for (final i in favs) card(i)]));
-      }
-      if (pop.isNotEmpty) {
-        top.add(Rail(title: 'Più seguiti in Italia', height: h, children: [for (final i in pop) card(i)]));
-      }
-    } else if (recents.isNotEmpty) {
-      top.add(Rail(title: 'Continua a guardare', height: h, children: [for (final i in recents) card(i)]));
-    }
-
-    return ListView(padding: const EdgeInsets.only(bottom: 32), children: [
-      hero,
-      ...top,
-      for (final e in state.grouped(items).entries)
-        Rail(title: e.key, height: h, children: [for (final i in e.value) card(i)]),
-    ]);
-  }
+            ]),
+          ),
+        ]),
+      ),
+    ),
+  );
 }
 
 class SearchScreen extends StatefulWidget {
@@ -196,8 +144,10 @@ class _SearchScreenState extends State<SearchScreen> {
             .toList();
     return SafeArea(
       child: Column(children: [
+        // Spazio per i pulsanti in alto a destra (riprendi, notifiche, impostazioni)
+        const SizedBox(height: 64),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
           child: TextField(
             onChanged: (v) => setState(() => q = v.trim().toLowerCase()),
             decoration: const InputDecoration(
@@ -245,10 +195,15 @@ class SeriesDetail extends StatelessWidget {
   final Item item;
   const SeriesDetail({super.key, required this.state, required this.item});
 
+  Item _ep(Episode e) =>
+      Item(name: e.title, url: e.url, group: item.name, kind: Kind.series, image: item.image);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(item.name), backgroundColor: Colors.transparent),
+      backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
       body: FutureBuilder<List<Episode>>(
         future: state.episodes(item),
         builder: (context, snap) {
@@ -259,32 +214,158 @@ class SeriesDetail extends StatelessWidget {
           if (snap.hasError || eps.isEmpty) {
             return const Center(child: Text('Episodi non disponibili.'));
           }
+          Episode? riprendi;
+          for (final e in eps) {
+            final pos = state.positionOf(e.url);
+            final dur = state.durations[e.url] ?? 0;
+            if (pos > 10 && (dur == 0 || pos < dur - 60)) {
+              riprendi = e;
+              break;
+            }
+          }
+          final heroEp = riprendi ?? eps.first;
           final seasons = <int, List<Episode>>{};
           for (final e in eps) {
             (seasons[e.season] ??= []).add(e);
           }
-          return ListView(children: [
+          return ListView(padding: EdgeInsets.zero, children: [
+            SizedBox(
+              height: 380,
+              child: Stack(fit: StackFit.expand, children: [
+                Art(url: item.image, title: item.name),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x66000000), Color(0x00000000), Colors.black],
+                      stops: [0, 0.4, 1],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 24,
+                  right: 24,
+                  bottom: 24,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(item.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.headlineMedium),
+                    const SizedBox(height: 6),
+                    Text(item.group, style: Theme.of(context).textTheme.bodySmall),
+                    if (riprendi != null) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'IN CORSO · S${riprendi.season} E${riprendi.number}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: () => openItem(context, state, _ep(heroEp)),
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: Text(riprendi != null
+                          ? 'Riprendi S${heroEp.season} E${heroEp.number}'
+                          : 'Riproduci'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 15),
+                      ),
+                    ),
+                  ]),
+                ),
+              ]),
+            ),
             for (final s in seasons.entries) ...[
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 6),
                 child: Text('Stagione ${s.key}', style: Theme.of(context).textTheme.titleMedium),
               ),
               for (final e in s.value)
-                ListTile(
-                  leading: Text('${e.number}',
-                      style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.accent)),
-                  title: Text(e.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  trailing: const Icon(Icons.play_arrow_rounded),
-                  onTap: () => openItem(
-                    context,
-                    state,
-                    Item(name: e.title, url: e.url, group: item.name, kind: Kind.series, image: item.image),
-                  ),
+                _EpisodeTile(
+                  episode: e,
+                  inCorso: riprendi?.url == e.url,
+                  progress: (() {
+                    final pos = state.positionOf(e.url);
+                    final dur = state.durations[e.url] ?? 0;
+                    if (pos <= 0 || dur <= 0) return null;
+                    return (pos / dur).clamp(0.0, 1.0).toDouble();
+                  })(),
+                  onTap: () => openItem(context, state, _ep(e)),
                 ),
             ],
+            const SizedBox(height: 32),
           ]);
         },
       ),
+    );
+  }
+}
+
+class _EpisodeTile extends StatelessWidget {
+  final Episode episode;
+  final bool inCorso;
+  final double? progress;
+  final VoidCallback onTap;
+  const _EpisodeTile({
+    required this.episode,
+    required this.inCorso,
+    required this.progress,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+      leading: SizedBox(
+        width: 32,
+        child: Center(
+          child: inCorso
+              ? const Icon(Icons.play_circle_fill_rounded, color: AppColors.accent, size: 24)
+              : Text(
+                  '${episode.number}',
+                  style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary),
+                ),
+        ),
+      ),
+      title: Text(episode.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: (progress != null && progress! > 0)
+          ? Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 3,
+                  backgroundColor: AppColors.surfaceHigh,
+                  color: AppColors.accent,
+                ),
+              ),
+            )
+          : null,
+      trailing: Icon(
+        inCorso ? Icons.play_arrow_rounded : Icons.play_circle_outline_rounded,
+        color: inCorso ? AppColors.accent : null,
+      ),
+      onTap: onTap,
     );
   }
 }
@@ -325,6 +406,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 shrinkWrap: true,
                 padding: const EdgeInsets.all(24),
                 children: [
+                  const BrandLogo(size: 30),
+                  const SizedBox(height: 28),
                   Text('Collega la tua playlist', style: Theme.of(context).textTheme.headlineMedium),
                   const SizedBox(height: 8),
                   Text('Inserisci il link M3U o i dati Xtream del tuo servizio.',
