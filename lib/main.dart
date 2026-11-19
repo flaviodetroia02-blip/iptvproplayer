@@ -124,6 +124,7 @@ class _ShellState extends State<Shell> {
     ).then((_) => s.routePop());
   }
 
+  /// FAB grande "Scorri": zapping su TV, feed verticale su Film/Serie.
   void _quickScroll() {
     final s = widget.state;
     Widget? page;
@@ -223,6 +224,10 @@ class _ShellState extends State<Shell> {
   Widget build(BuildContext context) {
     final s = widget.state;
     final wide = MediaQuery.of(context).size.width >= 900;
+    final showScrollFab = _index >= 0 && _index <= 2;
+    final fabLabel = _index == 0 ? 'Zapping' : 'Feed';
+    final fabIcon = _index == 0 ? Icons.swap_vert_rounded : Icons.swipe_vertical_rounded;
+
     return Scaffold(
       body: Stack(children: [
         Padding(
@@ -251,6 +256,28 @@ class _ShellState extends State<Shell> {
             ),
           ),
         ),
+        // FAB grande "Scorri"/"Zapping" in basso a destra
+        if (showScrollFab)
+          Positioned(
+            right: 16,
+            bottom: wide ? 16 : 96,
+            child: SafeArea(
+              child: FloatingActionButton.extended(
+                heroTag: 'scroll_fab',
+                onPressed: _quickScroll,
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                icon: Icon(fabIcon, size: 24),
+                label: Text(
+                  fabLabel,
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                ),
+                tooltip: _index == 0
+                    ? 'Zapping verticale canali'
+                    : 'Scorri film e serie in verticale',
+              ),
+            ),
+          ),
         Align(
           alignment: Alignment.topCenter,
           child: SafeArea(
@@ -271,6 +298,7 @@ class _ShellState extends State<Shell> {
               ),
             ),
           ),
+        // Barra in alto a destra: 3 pulsanti (riprendi, notifiche, impostazioni)
         Positioned(
           top: 0,
           right: 0,
@@ -278,13 +306,6 @@ class _ShellState extends State<Shell> {
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Row(children: [
-                IconButton(
-                  tooltip: _index == 0 ? 'Zapping' : 'Scorri contenuti',
-                  onPressed: _quickScroll,
-                  icon: const Icon(Icons.swap_vert_rounded),
-                  style: IconButton.styleFrom(backgroundColor: const Color(0x88000000)),
-                ),
-                const SizedBox(width: 8),
                 IconButton(
                   tooltip: 'Riprendi visione',
                   onPressed: () => showResumeSheet(context, s),
