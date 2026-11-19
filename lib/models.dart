@@ -5,7 +5,8 @@ class Item {
   final String? image;
   final Kind kind;
   final String? seriesId;
-  final int? added; // data di aggiunta (se il servizio la fornisce)
+  final int? added;
+  final String? trailerId;
   const Item({
     required this.name,
     required this.url,
@@ -14,12 +15,21 @@ class Item {
     this.image,
     this.seriesId,
     this.added,
+    this.trailerId,
   });
 
   String get id => seriesId != null ? 'series:$seriesId' : url;
 
-  Map<String, dynamic> toJson() =>
-      {'n': name, 'u': url, 'g': group, 'k': kind.index, 'i': image, 's': seriesId, 'a': added};
+  Map<String, dynamic> toJson() => {
+        'n': name,
+        'u': url,
+        'g': group,
+        'k': kind.index,
+        'i': image,
+        's': seriesId,
+        'a': added,
+        'y': trailerId,
+      };
 
   factory Item.fromJson(Map<String, dynamic> j) => Item(
         name: j['n'] as String,
@@ -29,15 +39,15 @@ class Item {
         image: j['i'] as String?,
         seriesId: j['s'] as String?,
         added: j['a'] as int?,
+        trailerId: j['y'] as String?,
       );
 }
 
 String _two(int n) => n.toString().padLeft(2, '0');
 
-/// Partita di Serie A o Champions League.
 class Fixture {
   final String home, away, league;
-  final String tag; // 'a' Serie A, 'eu' coppe europee, 'nz' nazionali
+  final String tag;
   final int score;
   final String? homeBadge, awayBadge;
   final DateTime start;
