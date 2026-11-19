@@ -157,6 +157,13 @@ class SettingsScreen extends StatelessWidget {
                 }
               },
             ),
+            _head('Aggiornamenti'),
+            ListTile(
+              leading: const Icon(Icons.system_update_rounded),
+              title: const Text('Controlla aggiornamenti'),
+              subtitle: Text(kBuild > 0 ? 'Versione installata: build $kBuild' : 'Versione senza numero di compilazione'),
+              onTap: () => showDialog(context: context, builder: (_) => const UpdateDialog()),
+            ),
             _head('App'),
             if (onFullScreen != null)
               ListTile(
@@ -174,7 +181,7 @@ class SettingsScreen extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              child: Text('Versione 0.7${kBuild > 0 ? ' (build $kBuild)' : ''}',
+              child: Text('Versione 0.7.1${kBuild > 0 ? ' (build $kBuild)' : ''}',
                   style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
             ),
           ]),
