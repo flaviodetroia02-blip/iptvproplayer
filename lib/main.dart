@@ -11,9 +11,12 @@ import 'device.dart';
 import 'updater.dart';
 import 'models.dart';
 import 'premium_nav.dart';
+import 'resume_sheet.dart';
 import 'settings_screen.dart';
 import 'screens.dart';
 import 'theme.dart';
+import 'vertical_feed_screen.dart';
+import 'zapping_screen.dart';
 
 bool get _desktop => !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
 
@@ -31,7 +34,7 @@ Future<void> main() async {
     await windowManager.waitUntilReadyToShow(
       const WindowOptions(title: kAppName, backgroundColor: Colors.black),
       () async {
-        await windowManager.setFullScreen(true); // su PC si apre a schermo intero
+        await windowManager.setFullScreen(true);
         await windowManager.show();
         await windowManager.focus();
       },
@@ -68,7 +71,6 @@ class _PlayerAppState extends State<PlayerApp> {
       theme: buildTheme(),
       builder: (context, child) => CallbackShortcuts(
         bindings: {
-          // F11 attiva/disattiva lo schermo intero, Esc lo chiude (solo su PC)
           const SingleActivator(LogicalKeyboardKey.f11): () => toggleFullScreen(),
           const SingleActivator(LogicalKeyboardKey.escape): () async {
             if (_desktop && await windowManager.isFullScreen()) {
@@ -120,6 +122,101 @@ class _ShellState extends State<Shell> {
         builder: (_) => SettingsScreen(state: s, onFullScreen: _desktop ? toggleFullScreen : null),
       ),
     ).then((_) => s.routePop());
+  }
+
+  void _quickScroll() {
+    final s = widget.state;
+    Widget? page;
+    if (_index == 0 && s.live.isNotEmpty) {
+      page = ZappingScreen(state: s, initialIndex: 0);
+    } else if (_index == 1 && s.movies.isNotEmpty) {
+      page = VerticalFeedScreen(state: s, kind: Kind.movie);
+    } else if (_index == 2 && s.series.isNotEmpty) {
+      page = VerticalFeedScreen(state: s, kind: Kind.series);
+    }
+    if (page == null) return;
+    s.routePush();
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page!))
+        .then((_) => s.routePop());
+  }
+
+  void _teamSheet() {
+    final s = widget.state;
+    const teams = [
+      'Inter', 'Milan', 'Juventus', 'Napoli', 'Roma', 'Lazio',
+      'Atalanta', 'Fiorentina', 'Bologna', 'Torino', 'Udinese', 'Genoa',
+      'Cagliari', 'Lecce', 'Hellas Verona', 'Empoli', 'Parma', 'Como',
+      'Monza', 'Venezia',
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.7),
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                  child: Text('Notifiche partite', style: Theme.of(ctx).textTheme.titleMedium),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.flag_rounded),
+                  title: const Text('Nazionale italiana'),
+                  subtitle: const Text('Notifiche per gli Azzurri'),
+                  value: s.nationalTeam,
+                  activeColor: AppColors.accent,
+                  onChanged: s.setNationalTeam,
+                ),
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  child: Text('Squadra del cuore',
+                      style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
+                          color: AppColors.textSecondary, fontWeight: FontWeight.w700)),
+                ),
+                Flexible(
+                  child: ListView(shrinkWrap: true, children: [
+                    ListTile(
+                      leading: Icon(
+                        s.favoriteTeam == null
+                            ? Icons.check_circle_rounded
+                            : Icons.circle_outlined,
+                        color: s.favoriteTeam == null
+                            ? AppColors.accent
+                            : AppColors.textSecondary,
+                      ),
+                      title: const Text('Nessuna'),
+                      onTap: () {
+                        s.setFavoriteTeam(null);
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                    for (final t in teams)
+                      ListTile(
+                        leading: Icon(
+                          s.favoriteTeam == t
+                              ? Icons.check_circle_rounded
+                              : Icons.circle_outlined,
+                          color: s.favoriteTeam == t
+                              ? AppColors.accent
+                              : AppColors.textSecondary,
+                        ),
+                        title: Text(t),
+                        onTap: () {
+                          s.setFavoriteTeam(t);
+                          Navigator.pop(ctx);
+                        },
+                      ),
+                  ]),
+                ),
+              ]),
+        ),
+      ),
+    );
   }
 
   @override
@@ -180,11 +277,38 @@ class _ShellState extends State<Shell> {
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: IconButton(
-                onPressed: _settings,
-                icon: const Icon(Icons.tune_rounded),
-                style: IconButton.styleFrom(backgroundColor: const Color(0x88000000)),
-              ),
+              child: Row(children: [
+                IconButton(
+                  tooltip: _index == 0 ? 'Zapping' : 'Scorri contenuti',
+                  onPressed: _quickScroll,
+                  icon: const Icon(Icons.swap_vert_rounded),
+                  style: IconButton.styleFrom(backgroundColor: const Color(0x88000000)),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: 'Riprendi visione',
+                  onPressed: () => showResumeSheet(context, s),
+                  icon: const Icon(Icons.history_rounded),
+                  style: IconButton.styleFrom(backgroundColor: const Color(0x88000000)),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: 'Notifiche partite',
+                  onPressed: _teamSheet,
+                  icon: Icon(
+                    s.favoriteTeam != null || s.nationalTeam
+                        ? Icons.notifications_active_rounded
+                        : Icons.notifications_none_rounded,
+                  ),
+                  style: IconButton.styleFrom(backgroundColor: const Color(0x88000000)),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: _settings,
+                  icon: const Icon(Icons.tune_rounded),
+                  style: IconButton.styleFrom(backgroundColor: const Color(0x88000000)),
+                ),
+              ]),
             ),
           ),
         ),
