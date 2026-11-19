@@ -4,10 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'app_state.dart';
+import 'epg.dart';
 import 'models.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
+/// Zapping verticale premium: una sola connessione video attiva alla volta,
+/// nessun pre-caricamento dei canali vicini, debounce sullo scroll.
 class ZappingScreen extends StatefulWidget {
   final AppState state;
   final int initialIndex;
@@ -26,6 +29,8 @@ class _ZappingScreenState extends State<ZappingScreen> {
 
   Timer? _debounce;
   String? _playingUrl;
+  bool _opening = false;
+  Epg? _epg;
   final _focus = FocusNode();
 
   List<Item> get _channels => widget.state.live;
@@ -52,6 +57,9 @@ class _ZappingScreenState extends State<ZappingScreen> {
     _debounce?.cancel();
     _player.stop();
     _playingUrl = null;
+    _opening = true;
+    _epg = null;
+    if (mounted) setState(() {});
     _debounce = Timer(const Duration(milliseconds: 400), () => _play(c));
   }
 
@@ -59,7 +67,14 @@ class _ZappingScreenState extends State<ZappingScreen> {
     if (!mounted) return;
     _playingUrl = c.url;
     await _player.open(Media(c.url));
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() => _opening = false);
+      fetchEpg(c.url).then((e) {
+        if (mounted && _channels[_index].url == c.url) {
+          setState(() => _epg = e);
+        }
+      });
+    }
   }
 
   void _next() {
@@ -91,6 +106,7 @@ class _ZappingScreenState extends State<ZappingScreen> {
     if (chs.isEmpty) {
       return const Scaffold(body: Center(child: Text('Nessun canale disponibile.')));
     }
+    final cur = chs[_index.clamp(0, chs.length - 1)];
     return Scaffold(
       backgroundColor: Colors.black,
       body: Focus(
@@ -110,11 +126,36 @@ class _ZappingScreenState extends State<ZappingScreen> {
               final c = chs[i];
               final isCurrent = i == _index;
               return Stack(fit: StackFit.expand, children: [
+                // Sfondo: logo sfocato + gradiente (riempie le bande nere)
+                if (c.image != null)
+                  Positioned.fill(
+                    child: Image.network(
+                      c.image!,
+                      fit: BoxFit.cover,
+                      color: Colors.black54,
+                      colorBlendMode: BlendMode.darken,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+                // Video del canale corrente (con fade-in)
                 if (isCurrent && _playingUrl == c.url)
-                  Video(controller: _video, controls: NoVideoControls, fit: BoxFit.contain)
-                else
-                  const ColoredBox(color: Colors.black),
-                if (!(isCurrent && _playingUrl == c.url))
+                  AnimatedOpacity(
+                    opacity: 1,
+                    duration: const Duration(milliseconds: 250),
+                    child: Video(
+                        controller: _video, controls: NoVideoControls, fit: BoxFit.contain),
+                  )
+                else if (isCurrent && _opening)
+                  const Center(
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 3, color: AppColors.accent),
+                    ),
+                  ),
+                // Logo grande del canale non corrente (placeholder)
+                if (!isCurrent)
                   Center(
                     child: SizedBox(
                       width: 220,
@@ -122,43 +163,190 @@ class _ZappingScreenState extends State<ZappingScreen> {
                       child: Art(url: c.image, title: c.name, contain: true),
                     ),
                   ),
+                // Numero canale in filigrana
+                Positioned(
+                  right: 20,
+                  top: 60,
+                  child: Text(
+                    '${(i + 1).toString().padLeft(3, '0')}',
+                    style: TextStyle(
+                      fontSize: 120,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white.withAlpha(20),
+                      height: 1,
+                    ),
+                  ),
+                ),
+                // Info in basso
                 Positioned(
                   left: 20,
-                  right: 20,
+                  right: 60,
                   bottom: 40,
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    if (isCurrent) const LiveBadge(),
-                    const SizedBox(height: 10),
-                    Text(c.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.headlineMedium),
-                    const SizedBox(height: 4),
-                    Text(c.group, style: Theme.of(context).textTheme.bodySmall),
-                  ]),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isCurrent) const LiveBadge(),
+                      const SizedBox(height: 10),
+                      Text(c.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.headlineMedium),
+                      const SizedBox(height: 4),
+                      Text(c.group, style: Theme.of(context).textTheme.bodySmall),
+                      if (isCurrent && _epg?.now != null) ...[
+                        const SizedBox(height: 14),
+                        _EpgBlock(epg: _epg!),
+                      ],
+                    ],
+                  ),
                 ),
               ]);
             },
           ),
+          // Mini lista canali laterale
+          Positioned(
+            right: 12,
+            top: 0,
+            bottom: 0,
+            child: SafeArea(
+              child: Center(
+                child: _ChannelMiniList(
+                  channels: chs,
+                  index: _index,
+                  onSelect: (i) {
+                    _page.animateToPage(i,
+                        duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+                  },
+                ),
+              ),
+            ),
+          ),
+          // Barra superiore
           SafeArea(
-            child: Row(children: [
-              BackButton(color: Colors.white, onPressed: () => Navigator.pop(context)),
-              Expanded(
-                child: Text(chs[_index.clamp(0, chs.length - 1)].name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: Text('${_index + 1}/${chs.length}',
-                    style: const TextStyle(
-                        color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-              ),
-            ]),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+              child: Row(children: [
+                BackButton(color: Colors.white, onPressed: () => Navigator.pop(context)),
+                Expanded(
+                  child: Text(cur.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                ),
+                IconButton(
+                  tooltip: widget.state.isFav(cur)
+                      ? 'Rimuovi dai preferiti'
+                      : 'Aggiungi ai preferiti',
+                  onPressed: () => widget.state.toggleFav(cur),
+                  icon: Icon(
+                    widget.state.isFav(cur)
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    color: widget.state.isFav(cur) ? AppColors.accent : Colors.white,
+                  ),
+                  style: IconButton.styleFrom(backgroundColor: const Color(0x88000000)),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0x88000000),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text('${_index + 1}/${chs.length}',
+                      style: const TextStyle(
+                          color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                ),
+              ]),
+            ),
           ),
         ]),
       ),
+    );
+  }
+}
+
+class _EpgBlock extends StatelessWidget {
+  final Epg epg;
+  const _EpgBlock({required this.epg});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = epg.now!;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(mainAxisSize: MainAxisSize.min, children: [
+        const Text('IN ONDA',
+            style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1,
+                color: AppColors.accent)),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(p.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+        ),
+      ]),
+      const SizedBox(height: 8),
+      SizedBox(
+        width: 240,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: LinearProgressIndicator(
+            value: p.progress,
+            minHeight: 3,
+            backgroundColor: Colors.white24,
+            color: AppColors.accent,
+          ),
+        ),
+      ),
+    ]);
+  }
+}
+
+class _ChannelMiniList extends StatelessWidget {
+  final List<Item> channels;
+  final int index;
+  final ValueChanged<int> onSelect;
+  const _ChannelMiniList({
+    required this.channels,
+    required this.index,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const window = 5;
+    final start = (index - 2).clamp(0, (channels.length - window).clamp(0, channels.length));
+    final end = (start + window).clamp(0, channels.length);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = start; i < end; i++)
+          GestureDetector(
+            onTap: () => onSelect(i),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              margin: const EdgeInsets.symmetric(vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: i == index ? AppColors.accent : const Color(0x66000000),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                '${i + 1}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: i == index ? Colors.white : Colors.white70,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
