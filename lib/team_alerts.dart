@@ -53,7 +53,7 @@ class TeamAlerts {
         ),
       );
     } catch (e) {
-      debugPrint('Errore test notifica: $e');
+      print('Errore test notifica: $e');
     }
   }
 
@@ -68,7 +68,8 @@ class TeamAlerts {
       final now = DateTime.now();
       var added = false;
 
-      for (final m in s.sportsMatches) {
+      // s.matches è il campo corretto in AppState
+      for (final m in s.matches) {
         if (m.start.isBefore(now)) continue;
         if (m.start.isAfter(now.add(const Duration(days: 3)))) continue;
 
