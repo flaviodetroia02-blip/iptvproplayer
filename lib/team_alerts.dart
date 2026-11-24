@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_state.dart';
@@ -68,7 +68,7 @@ class TeamAlerts {
       final now = DateTime.now();
       var added = false;
 
-      for (final m in s.matches) {
+      for (final m in s.sportsMatches) {
         if (m.start.isBefore(now)) continue;
         if (m.start.isAfter(now.add(const Duration(days: 3)))) continue;
 
