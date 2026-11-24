@@ -32,6 +32,31 @@ class TeamAlerts {
     await prefs.setStringList('notifiedMatches', l);
   }
 
+  /// Invia una notifica di prova per verificare che i permessi funzionino
+  static Future<void> testNotification() async {
+    if (kIsWeb) return;
+    try {
+      await init();
+      await _plugin.show(
+        999,
+        'Notifica di prova',
+        'Se vedi questo messaggio, le notifiche funzionano!',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'teams',
+            'Partite squadra del cuore',
+            channelDescription: 'Notifiche partite della squadra preferita e della Nazionale',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Errore test notifica: $e');
+    }
+  }
+
   static Future<void> check(AppState s) async {
     if (kIsWeb) return;
     final team = s.favoriteTeam?.toLowerCase();
