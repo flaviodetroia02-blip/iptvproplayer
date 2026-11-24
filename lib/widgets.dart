@@ -18,8 +18,6 @@ double uiScale(BuildContext c) {
 
 double sidePad(BuildContext c) => (MediaQuery.of(c).size.width * 0.03).clamp(20.0, 64.0).toDouble();
 
-/// Immagine con sfondo sfumato di riserva.
-/// filterQuality medium migliora lo scaling delle immagini a bassa risoluzione.
 class Art extends StatelessWidget {
   final String? url;
   final String title;
@@ -56,9 +54,9 @@ class Art extends StatelessWidget {
           child: Image.network(
             url!,
             fit: contain ? BoxFit.contain : BoxFit.cover,
-            filterQuality: FilterQuality.medium,
-            cacheWidth: 400,
-            cacheHeight: contain ? 400 : 600,
+            filterQuality: FilterQuality.high,
+            cacheWidth: 600,
+            cacheHeight: contain ? 600 : 900,
             errorBuilder: (_, __, ___) => label,
           ),
         ),
@@ -66,7 +64,6 @@ class Art extends StatelessWidget {
   }
 }
 
-/// Badge "DIRETTA" con puntino pulsante (animazione reattiva al colore).
 class LiveBadge extends StatefulWidget {
   const LiveBadge({super.key});
 
@@ -165,7 +162,6 @@ class _FocusTileState extends State<FocusTile> {
   }
 }
 
-/// Scheda canale premium: ombra colorata, gradiente sul fondo, badge pulsante.
 class LiveCard extends StatelessWidget {
   final Item item;
   final bool fav;
@@ -185,7 +181,6 @@ class LiveCard extends StatelessWidget {
             aspectRatio: 16 / 9,
             child: Stack(fit: StackFit.expand, children: [
               Art(url: item.image, title: item.name, contain: true),
-              // Gradiente scuro sul fondo: dà profondità
               const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -196,7 +191,6 @@ class LiveCard extends StatelessWidget {
                   ),
                 ),
               ),
-              // Alone colorato al focus
               if (active)
                 IgnorePointer(
                   child: DecoratedBox(
@@ -234,8 +228,7 @@ class LiveCard extends StatelessWidget {
   }
 }
 
-/// Locandina con pattern "sfondo + immagine": se il poster è 16:9 o quadrato,
-/// i lati vengono riempiti con la stessa immagine scurita invece di bande nere.
+/// Locandina pulita: solo cover. Nessun doppio strato.
 class PosterCard extends StatelessWidget {
   final Item item;
   final VoidCallback onTap;
@@ -255,29 +248,7 @@ class PosterCard extends StatelessWidget {
         builder: (active) => AspectRatio(
           aspectRatio: 2 / 3,
           child: Stack(fit: StackFit.expand, children: [
-            // 1) Sfondo: cover della stessa immagine, scurito
-            if (item.image != null)
-              Image.network(
-                item.image!,
-                fit: BoxFit.cover,
-                filterQuality: FilterQuality.low,
-                cacheWidth: 200,
-                color: Colors.black54,
-                colorBlendMode: BlendMode.darken,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-              ),
-            // 2) Foreground: contain per non tagliare il poster
-            if (item.image != null)
-              Image.network(
-                item.image!,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.medium,
-                cacheWidth: 400,
-                errorBuilder: (_, __, ___) => Art(url: item.image, title: item.name),
-              )
-            else
-              Art(url: item.image, title: item.name),
-            // 3) Overlay hover
+            Art(url: item.image, title: item.name),
             IgnorePointer(
               child: AnimatedOpacity(
                 opacity: active ? 1 : 0,
