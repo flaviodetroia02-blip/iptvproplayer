@@ -14,6 +14,7 @@ import 'premium_nav.dart';
 import 'resume_sheet.dart';
 import 'settings_screen.dart';
 import 'screens.dart';
+import 'team_alerts.dart';
 import 'theme.dart';
 import 'vertical_feed_screen.dart';
 import 'zapping_screen.dart';
@@ -124,7 +125,6 @@ class _ShellState extends State<Shell> {
     ).then((_) => s.routePop());
   }
 
-  /// FAB grande "Scorri": zapping su TV, feed verticale su Film/Serie.
   void _quickScroll() {
     final s = widget.state;
     Widget? page;
@@ -162,7 +162,25 @@ class _ShellState extends State<Shell> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-                  child: Text('Notifiche partite', style: Theme.of(ctx).textTheme.titleMedium),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Notifiche partite', style: Theme.of(ctx).textTheme.titleMedium),
+                      TextButton.icon(
+                        onPressed: () async {
+                          await TeamAlerts.testNotification();
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              const SnackBar(content: Text('Notifica di prova inviata!')),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.bug_report_rounded, size: 18),
+                        label: const Text('Test'),
+                        style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+                      ),
+                    ],
+                  ),
                 ),
                 SwitchListTile(
                   secondary: const Icon(Icons.flag_rounded),
@@ -256,7 +274,6 @@ class _ShellState extends State<Shell> {
             ),
           ),
         ),
-        // FAB grande "Scorri"/"Zapping" in basso a destra
         if (showScrollFab)
           Positioned(
             right: 16,
@@ -298,7 +315,6 @@ class _ShellState extends State<Shell> {
               ),
             ),
           ),
-        // Barra in alto a destra: 3 pulsanti (riprendi, notifiche, impostazioni)
         Positioned(
           top: 0,
           right: 0,
