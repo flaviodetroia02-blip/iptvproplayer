@@ -92,7 +92,6 @@ class XtreamClient {
           url: '$server/movie/$user/$pass/${s['stream_id']}.${s['container_extension'] ?? 'mp4'}',
           group: cats['${s['category_id']}'] ?? 'Altro',
           kind: Kind.movie,
-          // Per i film stream_icon_big è il poster grande e funziona bene.
           image: _imgBest([s['stream_icon_big'], s['stream_icon'], s['movie_image']]),
           added: int.tryParse('${s['added'] ?? ''}'),
           trailerId: _ytId(s['youtube_trailer']),
@@ -111,9 +110,8 @@ class XtreamClient {
           seriesId: '${s['series_id']}',
           group: cats['${s['category_id']}'] ?? 'Altro',
           kind: Kind.series,
-          // Per le serie 'cover' è il poster vero (2:3).
-          // 'cover_big' su molti provider è il backdrop 16:9 → si vedeva zoommato/brutto.
-          image: _imgBest([s['cover'], s['cover_big'], s['backdrop_path']]),
+          // Ora che le mostriamo in 16:9, cover_big (backdrop) è l'ideale
+          image: _imgBest([s['cover_big'], s['cover'], s['backdrop_path']]),
           added: int.tryParse('${s['last_modified'] ?? ''}'),
           trailerId: _ytId(s['youtube_trailer']),
         ),
