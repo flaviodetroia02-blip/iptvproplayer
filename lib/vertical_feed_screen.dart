@@ -8,9 +8,6 @@ import 'screens.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-/// Feed verticale per Film e Serie presenti nella lista caricata.
-/// Su Firestick: cambio contenuto ISTANTANEO, niente parallasse.
-/// Il trailer si apre nell'app YouTube o nel browser (url_launcher), zero WebView interna.
 class VerticalFeedScreen extends StatefulWidget {
   final AppState state;
   final Kind kind;
@@ -108,16 +105,8 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
             itemBuilder: (_, i) {
               final it = _items[i];
 
-              // Immagine: niente parallasse, direttamente cover.
-              final image = it.trailerId != null
-                  ? Image.network(
-                      'https://img.youtube.com/vi/${it.trailerId}/maxresdefault.jpg',
-                      fit: BoxFit.cover,
-                      filterQuality: FilterQuality.medium,
-                      cacheWidth: 1280,
-                      errorBuilder: (_, __, ___) => Art(url: it.image, title: it.name),
-                    )
-                  : Art(url: it.image, title: it.name);
+              // Usiamo Art (alleggerito) per lo sfondo.
+              final image = Art(url: it.image, title: it.name);
 
               return Stack(fit: StackFit.expand, children: [
                 image,
