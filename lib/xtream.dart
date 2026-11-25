@@ -110,8 +110,9 @@ class XtreamClient {
           seriesId: '${s['series_id']}',
           group: cats['${s['category_id']}'] ?? 'Altro',
           kind: Kind.series,
-          // Ora che le mostriamo in 16:9, cover_big (backdrop) è l'ideale
-          image: _imgBest([s['cover_big'], s['cover'], s['backdrop_path']]),
+          // cover = poster verticale 2:3 (quello che si vedeva bene all'inizio).
+          // cover_big = spesso backdrop 16:9 → lo teniamo solo come fallback.
+          image: _imgBest([s['cover'], s['cover_big'], s['backdrop_path']]),
           added: int.tryParse('${s['last_modified'] ?? ''}'),
           trailerId: _ytId(s['youtube_trailer']),
         ),
