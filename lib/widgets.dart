@@ -228,7 +228,9 @@ class LiveCard extends StatelessWidget {
   }
 }
 
-/// Locandina pulita: solo cover. Nessun doppio strato.
+/// Locandina intelligente:
+/// - Film: AspectRatio 2/3 (poster verticale)
+/// - Serie: AspectRatio 16/9 (copertina orizzontale, stile Netflix)
 class PosterCard extends StatelessWidget {
   final Item item;
   final VoidCallback onTap;
@@ -238,15 +240,21 @@ class PosterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = progress;
+    // Se è una serie, usiamo l'aspetto orizzontale, altrimenti verticale
+    final isSeries = item.kind == Kind.series;
+    final ratio = isSeries ? 16 / 9 : 2 / 3;
+    // Le serie sono più larghe
+    final cardWidth = isSeries ? 220.0 * uiScale(context) : 150 * uiScale(context);
+
     return SizedBox(
-      width: 150 * uiScale(context),
+      width: cardWidth,
       child: FocusTile(
         radius: 6,
         scale: 1.08,
         border: false,
         onTap: onTap,
         builder: (active) => AspectRatio(
-          aspectRatio: 2 / 3,
+          aspectRatio: ratio,
           child: Stack(fit: StackFit.expand, children: [
             Art(url: item.image, title: item.name),
             IgnorePointer(
@@ -271,7 +279,7 @@ class PosterCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(item.name,
-                              maxLines: 3,
+                              maxLines: isSeries ? 1 : 3,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
                           const SizedBox(height: 8),
